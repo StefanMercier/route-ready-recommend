@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Clock, Route, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import GoogleMap from '@/components/GoogleMap';
+import { validateZipCode } from '@/services/distanceService';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -22,6 +23,7 @@ const TravelPlanner = () => {
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TravelCalculation | null>(null);
+  const [useRealDistance, setUseRealDistance] = useState(false);
 
   const calculateTravelTime = (distance: number): TravelCalculation => {
     // Calculate driving time (miles / 60 mph average)
@@ -49,6 +51,17 @@ const TravelPlanner = () => {
     };
   };
 
+  const handleDistanceCalculated = (distance: number, duration: number) => {
+    const calculation = calculateTravelTime(distance);
+    setResult(calculation);
+    setUseRealDistance(true);
+    
+    toast({
+      title: "Route Calculated",
+      description: `Real distance: ${distance.toFixed(1)} miles, Travel time: ${calculation.totalTravelTime.toFixed(1)} hours`,
+    });
+  };
+
   const handleCalculate = async () => {
     if (!departure.trim() || !destination.trim()) {
       toast({
@@ -59,19 +72,27 @@ const TravelPlanner = () => {
       return;
     }
 
+    if (!validateZipCode(departure) || !validateZipCode(destination)) {
+      toast({
+        title: "Invalid Format",
+        description: "Please enter valid US ZIP codes or Canadian postal codes.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
-      // For demo purposes, simulate distance calculation
-      // In a real app, you'd use a geocoding/routing API
-      const mockDistance = Math.floor(Math.random() * 800) + 100; // 100-900 miles
-      
+      // For demo purposes when Google Maps is not loaded
+      const mockDistance = Math.floor(Math.random() * 800) + 100;
       const calculation = calculateTravelTime(mockDistance);
       setResult(calculation);
+      setUseRealDistance(false);
       
       toast({
-        title: "Calculation Complete",
-        description: `Travel time calculated: ${calculation.totalTravelTime.toFixed(1)} hours`,
+        title: "Calculation Complete (Demo)",
+        description: `Estimated travel time: ${calculation.totalTravelTime.toFixed(1)} hours. Load Google Maps for real data.`,
       });
     } catch (error) {
       toast({
@@ -105,7 +126,7 @@ const TravelPlanner = () => {
               Route Planning
             </CardTitle>
             <CardDescription>
-              Enter your departure and destination to calculate travel time and get recommendations
+              Enter your departure and destination ZIP/postal codes to calculate travel time and get recommendations
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -135,7 +156,7 @@ const TravelPlanner = () => {
               disabled={loading}
               className="w-full"
             >
-              {loading ? 'Calculating...' : 'Calculate Travel Time'}
+              {loading ? 'Calculating...' : 'Calculate Travel Time (Demo)'}
             </Button>
           </CardContent>
         </Card>
@@ -248,18 +269,17 @@ const TravelPlanner = () => {
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
                 Route Map
+                {useRealDistance && (
+                  <Badge variant="default" className="ml-2">Real Data</Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-gray-100 rounded-lg p-8 text-center">
-                <p className="text-gray-600 mb-2">Interactive route map will be displayed here</p>
-                <p className="text-sm text-gray-500">
-                  Route: {departure} → {destination}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Distance: {result.totalDistance.toFixed(0)} miles
-                </p>
-              </div>
+              <GoogleMap 
+                departure={departure}
+                destination={destination}
+                onDistanceCalculated={handleDistanceCalculated}
+              />
             </CardContent>
           </Card>
         )}
