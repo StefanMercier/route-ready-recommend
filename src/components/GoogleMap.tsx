@@ -16,7 +16,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState('AIzaSyBHo7mGrIVcmsDE_QjKaB4QjNn3emmSPSI');
   const [isLoaded, setIsLoaded] = useState(false);
 
   const initializeMap = async (key: string) => {
@@ -82,6 +82,13 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
     }
   }, [isLoaded, departure, destination]);
 
+  // Auto-load the map with the provided API key
+  useEffect(() => {
+    if (apiKey && !isLoaded) {
+      initializeMap(apiKey);
+    }
+  }, [apiKey, isLoaded]);
+
   return (
     <div className="space-y-4">
       {!isLoaded && (
@@ -111,7 +118,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       
       {!isLoaded && (
         <div className="w-full h-96 rounded-lg border bg-gray-100 flex items-center justify-center">
-          <p className="text-gray-600">Enter API key to load Google Maps</p>
+          <p className="text-gray-600">Loading Google Maps...</p>
         </div>
       )}
     </div>
