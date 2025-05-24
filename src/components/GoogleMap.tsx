@@ -4,6 +4,8 @@ import { Loader } from '@googlemaps/js-api-loader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 interface GoogleMapProps {
   departure: string;
@@ -18,11 +20,13 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
   const [apiKey, setApiKey] = useState('AIzaSyBHo7mGrIVcmsDE_QjKaB4QjNn3emmSPSI');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const initializeMap = async (key: string) => {
     if (!mapRef.current || !key) return;
 
     try {
+      setApiError(null);
       const loader = new Loader({
         apiKey: key,
         version: 'weekly',
@@ -47,11 +51,14 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       setIsLoaded(true);
     } catch (error) {
       console.error('Error loading Google Maps:', error);
+      setApiError('Failed to load Google Maps. Please check your API key and ensure the Maps JavaScript API is enabled.');
     }
   };
 
   const calculateRoute = () => {
     if (!directionsService || !directionsRenderer || !departure || !destination) return;
+
+    console.log('Attempting to calculate route from', departure, 'to', destination);
 
     directionsService.route(
       {
@@ -60,6 +67,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         travelMode: google.maps.TravelMode.DRIVING,
       },
       (result, status) => {
+        console.log('Directions API response:', { status, result });
+        
         if (status === 'OK' && result) {
           directionsRenderer.setDirections(result);
           
@@ -68,9 +77,22 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           const distanceInMiles = leg.distance ? leg.distance.value * 0.000621371 : 0;
           const durationInHours = leg.duration ? leg.duration.value / 3600 : 0;
           
+          console.log('Real distance calculated:', distanceInMiles, 'miles');
           onDistanceCalculated(distanceInMiles, durationInHours);
+          setApiError(null);
         } else {
           console.error('Directions request failed due to:', status);
+          let errorMessage = 'Failed to calculate route.';
+          
+          if (status === 'REQUEST_DENIED') {
+            errorMessage = 'API request denied. Please ensure your Google Maps API key has the Directions API enabled and proper billing is set up.';
+          } else if (status === 'ZERO_RESULTS') {
+            errorMessage = 'No route found between these locations.';
+          } else if (status === 'OVER_QUERY_LIMIT') {
+            errorMessage = 'API quota exceeded. Please try again later.';
+          }
+          
+          setApiError(errorMessage);
         }
       }
     );
@@ -91,7 +113,26 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
 
   return (
     <div className="space-y-4">
-      {!isLoaded && (
+      {apiError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {apiError}
+            <br />
+            <strong>Setup Instructions:</strong>
+            <br />
+            1. Go to Google Cloud Console
+            <br />
+            2. Enable "Maps JavaScript API" and "Directions API"
+            <br />
+            3. Ensure billing is enabled for your project
+            <br />
+            4. The app will fall back to demo calculations until this is fixed
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!isLoaded && !apiError && (
         <div className="space-y-2">
           <Label htmlFor="apiKey">Google Maps API Key</Label>
           <Input
@@ -105,7 +146,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
             Load Map
           </Button>
           <p className="text-sm text-gray-600">
-            Get your API key from Google Cloud Console and enable Maps JavaScript API and Distance Matrix API
+            Get your API key from Google Cloud Console and enable Maps JavaScript API and Directions API
           </p>
         </div>
       )}
@@ -116,7 +157,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         style={{ display: isLoaded ? 'block' : 'none' }}
       />
       
-      {!isLoaded && (
+      {!isLoaded && !apiError && (
         <div className="w-full h-96 rounded-lg border bg-gray-100 flex items-center justify-center">
           <p className="text-gray-600">Loading Google Maps...</p>
         </div>
