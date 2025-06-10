@@ -219,13 +219,24 @@ const TravelPlanner = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-center">
+                <div className="text-center space-y-4">
                   <Badge 
                     variant={result.recommendation === 'flight' ? 'destructive' : 'default'}
                     className="text-lg px-4 py-2"
                   >
                     {result.recommendation === 'flight' ? 'Recommend Flight' : 'Recommend Motorcoach'}
                   </Badge>
+                  
+                  <div className="flex justify-center">
+                    <img 
+                      src={result.recommendation === 'flight' 
+                        ? '/lovable-uploads/ebecb2ad-f891-43ab-a556-05cfa76b0d5e.png'
+                        : '/lovable-uploads/809dd6be-db03-41d4-a4e9-071467435b58.png'
+                      }
+                      alt={result.recommendation === 'flight' ? 'Commercial airplane' : 'Motorcoach buses'}
+                      className="w-48 h-32 object-cover rounded-lg shadow-md"
+                    />
+                  </div>
                 </div>
                 
                 <div className="text-sm text-gray-600 space-y-2">
