@@ -22,6 +22,18 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const [isLoaded, setIsLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const formatLocationForMaps = (location: string): string => {
+    // Add "USA" to ZIP codes to improve geocoding
+    if (/^\d{5}(-\d{4})?$/.test(location.trim())) {
+      return `${location.trim()}, USA`;
+    }
+    // Add "Canada" to Canadian postal codes
+    if (/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(location.trim())) {
+      return `${location.trim()}, Canada`;
+    }
+    return location.trim();
+  };
+
   const initializeMap = async (key: string) => {
     if (!mapRef.current || !key) return;
 
@@ -58,12 +70,15 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const calculateRoute = () => {
     if (!directionsService || !directionsRenderer || !departure || !destination) return;
 
-    console.log('Attempting to calculate route from', departure, 'to', destination);
+    const formattedDeparture = formatLocationForMaps(departure);
+    const formattedDestination = formatLocationForMaps(destination);
+
+    console.log('Attempting to calculate route from', formattedDeparture, 'to', formattedDestination);
 
     directionsService.route(
       {
-        origin: departure,
-        destination: destination,
+        origin: formattedDeparture,
+        destination: formattedDestination,
         travelMode: google.maps.TravelMode.DRIVING,
       },
       (result, status) => {
@@ -88,6 +103,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
             errorMessage = 'API request denied. Please ensure your Google Maps API key has the Directions API enabled and proper billing is set up.';
           } else if (status === 'ZERO_RESULTS') {
             errorMessage = 'No route found between these locations.';
+          } else if (status === 'NOT_FOUND') {
+            errorMessage = `Could not find one or both locations. Please verify that "${departure}" and "${destination}" are valid ZIP codes or addresses. Try using full addresses like "Beverly Hills, CA 90210" instead of just "90210".`;
           } else if (status === 'OVER_QUERY_LIMIT') {
             errorMessage = 'API quota exceeded. Please try again later.';
           }
@@ -119,6 +136,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           <AlertDescription>
             {apiError}
             <br />
+            {apiError.includes('Could not find') && (
+              <>
+                <strong>Tip:</strong> Try using full addresses like "Beverly Hills, CA 90210" or "Reading, MA 01867" instead of just ZIP codes.
+                <br />
+              </>
+            )}
             <strong>Setup Instructions:</strong>
             <br />
             1. Go to Google Cloud Console
