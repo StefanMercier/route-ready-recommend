@@ -17,20 +17,10 @@ interface User {
   created_at: string;
 }
 
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  target_user_id: string | null;
-  details: any;
-  created_at: string;
-}
-
 const AdminPanel = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [showAuditLogs, setShowAuditLogs] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -39,7 +29,6 @@ const AdminPanel = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
-      fetchAuditLogs();
     }
   }, [isAdmin]);
 
@@ -52,7 +41,7 @@ const AdminPanel = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc('is_admin_user');
+      const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
       if (!error) {
         setIsAdmin(data);
       } else {
@@ -86,21 +75,6 @@ const AdminPanel = () => {
     }
   };
 
-  const fetchAuditLogs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('admin_audit_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setAuditLogs(data || []);
-    } catch (error) {
-      console.error('Error fetching audit logs:', error);
-    }
-  };
-
   const togglePaymentStatus = async (userId: string, currentStatus: boolean, userEmail: string) => {
     if (!isAdmin) {
       toast({
@@ -119,17 +93,6 @@ const AdminPanel = () => {
 
       if (error) throw error;
 
-      // Log the admin action
-      await supabase.rpc('log_admin_action', {
-        action_type: 'payment_status_changed',
-        target_user: userId,
-        action_details: {
-          old_status: currentStatus,
-          new_status: !currentStatus,
-          target_email: userEmail
-        }
-      });
-
       setUsers(users.map(user => 
         user.id === userId 
           ? { ...user, has_paid: !currentStatus }
@@ -140,9 +103,6 @@ const AdminPanel = () => {
         title: "Success",
         description: `Payment status updated for ${userEmail}`,
       });
-
-      // Refresh audit logs
-      fetchAuditLogs();
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast({
@@ -227,46 +187,6 @@ const AdminPanel = () => {
             </CardContent>
           </Card>
         </div>
-
-        <div className="flex gap-4">
-          <Button
-            variant={showAuditLogs ? "default" : "outline"}
-            onClick={() => setShowAuditLogs(!showAuditLogs)}
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            {showAuditLogs ? "Hide" : "Show"} Audit Logs
-          </Button>
-        </div>
-
-        {showAuditLogs && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Admin Audit Log</CardTitle>
-              <CardDescription>
-                Recent admin actions and system events
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="p-3 border rounded-lg text-sm">
-                    <div className="flex justify-between items-start">
-                      <span className="font-medium">{log.action}</span>
-                      <span className="text-gray-500">
-                        {new Date(log.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    {log.details && (
-                      <div className="mt-1 text-gray-600">
-                        {JSON.stringify(log.details, null, 2)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader>
