@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { validateZipCode } from '@/services/distanceService';
@@ -6,6 +7,8 @@ import RouteInputForm from '@/components/RouteInputForm';
 import TravelResults from '@/components/TravelResults';
 import RouteMap from '@/components/RouteMap';
 import UserMenu from '@/components/UserMenu';
+import PaymentGate from '@/components/PaymentGate';
+import { usePaymentStatus } from '@/hooks/usePaymentStatus';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -22,6 +25,7 @@ const TravelPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TravelCalculation | null>(null);
   const [useRealDistance, setUseRealDistance] = useState(false);
+  const { hasPaid, loading: paymentLoading } = usePaymentStatus();
 
   const calculateTravelTime = (distance: number): TravelCalculation => {
     // Calculate driving time (miles / 60 mph average)
@@ -103,37 +107,50 @@ const TravelPlanner = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <TravelBanner />
-          <UserMenu />
+  if (paymentLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
+      </div>
+    );
+  }
 
-        <RouteInputForm
-          departure={departure}
-          destination={destination}
-          loading={loading}
-          onDepartureChange={setDeparture}
-          onDestinationChange={setDestination}
-          onCalculate={handleCalculate}
-        />
+  return (
+    <PaymentGate hasPaid={hasPaid}>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="flex justify-between items-center">
+            <TravelBanner />
+            <UserMenu />
+          </div>
 
-        {result && (
-          <TravelResults result={result} />
-        )}
-
-        {result && (
-          <RouteMap
+          <RouteInputForm
             departure={departure}
             destination={destination}
-            useRealDistance={useRealDistance}
-            onDistanceCalculated={handleDistanceCalculated}
+            loading={loading}
+            onDepartureChange={setDeparture}
+            onDestinationChange={setDestination}
+            onCalculate={handleCalculate}
           />
-        )}
+
+          {result && (
+            <TravelResults result={result} />
+          )}
+
+          {result && (
+            <RouteMap
+              departure={departure}
+              destination={destination}
+              useRealDistance={useRealDistance}
+              onDistanceCalculated={handleDistanceCalculated}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </PaymentGate>
   );
 };
 

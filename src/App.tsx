@@ -10,6 +10,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import TravelPlanner from "./pages/TravelPlanner";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,22 @@ const App: React.FC = () => (
               element={
                 <ProtectedRoute>
                   <TravelPlanner />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/payment-success" 
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminPanel />
                 </ProtectedRoute>
               } 
             />
