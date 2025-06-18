@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Shield, Users, DollarSign } from 'lucide-react';
+import { Shield, Users, DollarSign, AlertTriangle } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
 
 interface User {
@@ -17,27 +17,53 @@ interface User {
   created_at: string;
 }
 
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  target_user_id: string | null;
+  details: any;
+  created_at: string;
+}
+
 const AdminPanel = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
-    fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers();
+      fetchAuditLogs();
+    }
+  }, [isAdmin]);
 
   const checkAdminStatus = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
 
-      const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
+      const { data, error } = await supabase.rpc('is_admin_user');
       if (!error) {
         setIsAdmin(data);
+      } else {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,12 +83,34 @@ const AdminPanel = () => {
         description: "Failed to load users",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const togglePaymentStatus = async (userId: string, currentStatus: boolean) => {
+  const fetchAuditLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_audit_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setAuditLogs(data || []);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+    }
+  };
+
+  const togglePaymentStatus = async (userId: string, currentStatus: boolean, userEmail: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Admin privileges required",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('profiles')
@@ -70,6 +118,17 @@ const AdminPanel = () => {
         .eq('id', userId);
 
       if (error) throw error;
+
+      // Log the admin action
+      await supabase.rpc('log_admin_action', {
+        action_type: 'payment_status_changed',
+        target_user: userId,
+        action_details: {
+          old_status: currentStatus,
+          new_status: !currentStatus,
+          target_email: userEmail
+        }
+      });
 
       setUsers(users.map(user => 
         user.id === userId 
@@ -79,8 +138,11 @@ const AdminPanel = () => {
 
       toast({
         title: "Success",
-        description: `Payment status updated successfully`,
+        description: `Payment status updated for ${userEmail}`,
       });
+
+      // Refresh audit logs
+      fetchAuditLogs();
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast({
@@ -90,6 +152,17 @@ const AdminPanel = () => {
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -155,6 +228,46 @@ const AdminPanel = () => {
           </Card>
         </div>
 
+        <div className="flex gap-4">
+          <Button
+            variant={showAuditLogs ? "default" : "outline"}
+            onClick={() => setShowAuditLogs(!showAuditLogs)}
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            {showAuditLogs ? "Hide" : "Show"} Audit Logs
+          </Button>
+        </div>
+
+        {showAuditLogs && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Audit Log</CardTitle>
+              <CardDescription>
+                Recent admin actions and system events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-3 border rounded-lg text-sm">
+                    <div className="flex justify-between items-start">
+                      <span className="font-medium">{log.action}</span>
+                      <span className="text-gray-500">
+                        {new Date(log.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {log.details && (
+                      <div className="mt-1 text-gray-600">
+                        {JSON.stringify(log.details, null, 2)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>User Management</CardTitle>
@@ -163,41 +276,37 @@ const AdminPanel = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="text-center py-8">Loading users...</div>
-            ) : (
-              <div className="space-y-4">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{user.email}</span>
-                        {user.has_paid && (
-                          <Badge variant="default" className="bg-green-100 text-green-800">
-                            Paid
-                          </Badge>
-                        )}
-                      </div>
-                      {user.full_name && (
-                        <p className="text-sm text-gray-600">{user.full_name}</p>
-                      )}
-                      <p className="text-xs text-gray-500">
-                        Joined: {new Date(user.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
+            <div className="space-y-4">
+              {users.map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">
-                        {user.has_paid ? 'Paid' : 'Free'}
-                      </span>
-                      <Switch
-                        checked={user.has_paid}
-                        onCheckedChange={() => togglePaymentStatus(user.id, user.has_paid)}
-                      />
+                      <span className="font-medium">{user.email}</span>
+                      {user.has_paid && (
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          Paid
+                        </Badge>
+                      )}
                     </div>
+                    {user.full_name && (
+                      <p className="text-sm text-gray-600">{user.full_name}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Joined: {new Date(user.created_at).toLocaleDateString()}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {user.has_paid ? 'Paid' : 'Free'}
+                    </span>
+                    <Switch
+                      checked={user.has_paid}
+                      onCheckedChange={() => togglePaymentStatus(user.id, user.has_paid, user.email)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
