@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { MapPin, Clock, Route, Calculator } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -14,11 +13,18 @@ const Index = () => {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Smart travel planning for trip organizers. Calculate distances, travel times, and get recommendations for motorcoach vs flight decisions based on DOT regulations.
           </p>
-          <Link to="/planner">
-            <Button size="lg" className="text-lg px-8 py-3">
-              Start Planning Your Trip
-            </Button>
-          </Link>
+          <div className="flex gap-4 justify-center">
+            <Link to="/auth">
+              <Button size="lg" className="text-lg px-8 py-3">
+                Get Started
+              </Button>
+            </Link>
+            <Link to="/auth">
+              <Button size="lg" variant="outline" className="text-lg px-8 py-3">
+                Start Planning Your Trip
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">

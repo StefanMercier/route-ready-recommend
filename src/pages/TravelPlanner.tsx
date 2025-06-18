@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { validateZipCode } from '@/services/distanceService';
@@ -6,6 +5,7 @@ import TravelBanner from '@/components/TravelBanner';
 import RouteInputForm from '@/components/RouteInputForm';
 import TravelResults from '@/components/TravelResults';
 import RouteMap from '@/components/RouteMap';
+import UserMenu from '@/components/UserMenu';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -106,7 +106,10 @@ const TravelPlanner = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
-        <TravelBanner />
+        <div className="flex justify-between items-center">
+          <TravelBanner />
+          <UserMenu />
+        </div>
 
         <RouteInputForm
           departure={departure}
