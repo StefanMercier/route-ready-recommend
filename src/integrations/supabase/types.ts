@@ -9,11 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
           email: string | null
           full_name: string | null
+          has_paid: boolean
           id: string
           updated_at: string
         }
@@ -21,6 +43,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
+          has_paid?: boolean
           id: string
           updated_at?: string
         }
@@ -28,6 +51,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
+          has_paid?: boolean
           id?: string
           updated_at?: string
         }
@@ -38,7 +62,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
