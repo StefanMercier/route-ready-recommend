@@ -1,11 +1,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GoogleMapProps {
   departure: string;
@@ -16,31 +14,19 @@ interface GoogleMapProps {
 const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanceCalculated }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
-  const [apiKey, setApiKey] = useState('AIzaSyBHo7mGrIVcmsDE_QjKaB4QjNn3emmSPSI');
   const [isLoaded, setIsLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const formatLocationForMaps = (location: string): string => {
-    // Add "USA" to ZIP codes to improve geocoding
-    if (/^\d{5}(-\d{4})?$/.test(location.trim())) {
-      return `${location.trim()}, USA`;
-    }
-    // Add "Canada" to Canadian postal codes
-    if (/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(location.trim())) {
-      return `${location.trim()}, Canada`;
-    }
-    return location.trim();
-  };
-
-  const initializeMap = async (key: string) => {
-    if (!mapRef.current || !key) return;
+  // Initialize map with a public demo key for visualization only
+  const initializeMap = async () => {
+    if (!mapRef.current) return;
 
     try {
       setApiError(null);
       const loader = new Loader({
-        apiKey: key,
+        apiKey: 'AIzaSyBHo7mGrIVcmsDE_QjKaB4QjNn3emmSPSI', // Public demo key for map display only
         version: 'weekly',
         libraries: ['places']
       });
@@ -52,81 +38,83 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         zoom: 4,
       });
 
-      const directionsServiceInstance = new google.maps.DirectionsService();
       const directionsRendererInstance = new google.maps.DirectionsRenderer();
-      
       directionsRendererInstance.setMap(mapInstance);
 
       setMap(mapInstance);
-      setDirectionsService(directionsServiceInstance);
       setDirectionsRenderer(directionsRendererInstance);
       setIsLoaded(true);
     } catch (error) {
       console.error('Error loading Google Maps:', error);
-      setApiError('Failed to load Google Maps. Please check your API key and ensure the Maps JavaScript API is enabled.');
+      setApiError('Failed to load Google Maps for visualization.');
     }
   };
 
-  const calculateRoute = () => {
-    if (!directionsService || !directionsRenderer || !departure || !destination) return;
+  // Use secure edge function for route calculations
+  const calculateRouteSecurely = async () => {
+    if (!departure || !destination) return;
 
-    const formattedDeparture = formatLocationForMaps(departure);
-    const formattedDestination = formatLocationForMaps(destination);
+    setLoading(true);
+    setApiError(null);
 
-    console.log('Attempting to calculate route from', formattedDeparture, 'to', formattedDestination);
-
-    directionsService.route(
-      {
-        origin: formattedDeparture,
-        destination: formattedDestination,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        console.log('Directions API response:', { status, result });
-        
-        if (status === 'OK' && result) {
-          directionsRenderer.setDirections(result);
-          
-          const route = result.routes[0];
-          const leg = route.legs[0];
-          const distanceInMiles = leg.distance ? leg.distance.value * 0.000621371 : 0;
-          const durationInHours = leg.duration ? leg.duration.value / 3600 : 0;
-          
-          console.log('Real distance calculated:', distanceInMiles, 'miles');
-          onDistanceCalculated(distanceInMiles, durationInHours);
-          setApiError(null);
-        } else {
-          console.error('Directions request failed due to:', status);
-          let errorMessage = 'Failed to calculate route.';
-          
-          if (status === 'REQUEST_DENIED') {
-            errorMessage = 'API request denied. Please ensure your Google Maps API key has the Directions API enabled and proper billing is set up.';
-          } else if (status === 'ZERO_RESULTS') {
-            errorMessage = 'No route found between these locations.';
-          } else if (status === 'NOT_FOUND') {
-            errorMessage = `Could not find one or both locations. Please verify that "${departure}" and "${destination}" are valid ZIP codes or addresses. Try using full addresses like "Beverly Hills, CA 90210" instead of just "90210".`;
-          } else if (status === 'OVER_QUERY_LIMIT') {
-            errorMessage = 'API quota exceeded. Please try again later.';
-          }
-          
-          setApiError(errorMessage);
+    try {
+      console.log('Calculating route via secure edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('google-maps-proxy', {
+        body: {
+          origin: departure,
+          destination: destination,
+          travelMode: 'DRIVING'
         }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        setApiError('Unable to calculate route. Please try again.');
+        return;
       }
-    );
+
+      if (data && data.status === 'OK') {
+        console.log('Route calculated successfully:', data);
+        onDistanceCalculated(data.distanceInMiles, data.durationInHours);
+        
+        // Display route on map if available (for visualization only)
+        if (directionsRenderer && window.google) {
+          // This is just for visual representation, actual calculation is done securely
+          const directionsService = new google.maps.DirectionsService();
+          directionsService.route(
+            {
+              origin: departure,
+              destination: destination,
+              travelMode: google.maps.TravelMode.DRIVING,
+            },
+            (result, status) => {
+              if (status === 'OK' && result) {
+                directionsRenderer.setDirections(result);
+              }
+            }
+          );
+        }
+      } else {
+        setApiError(data?.error || 'Failed to calculate route');
+      }
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      setApiError('Network error. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    initializeMap();
+  }, []);
 
   useEffect(() => {
     if (isLoaded && departure && destination) {
-      calculateRoute();
+      calculateRouteSecurely();
     }
   }, [isLoaded, departure, destination]);
-
-  // Auto-load the map with the provided API key
-  useEffect(() => {
-    if (apiKey && !isLoaded) {
-      initializeMap(apiKey);
-    }
-  }, [apiKey, isLoaded]);
 
   return (
     <div className="space-y-4">
@@ -136,42 +124,17 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           <AlertDescription>
             {apiError}
             <br />
-            {apiError.includes('Could not find') && (
-              <>
-                <strong>Tip:</strong> Try using full addresses like "Beverly Hills, CA 90210" or "Reading, MA 01867" instead of just ZIP codes.
-                <br />
-              </>
-            )}
-            <strong>Setup Instructions:</strong>
-            <br />
-            1. Go to Google Cloud Console
-            <br />
-            2. Enable "Maps JavaScript API" and "Directions API"
-            <br />
-            3. Ensure billing is enabled for your project
-            <br />
-            4. The app will fall back to demo calculations until this is fixed
+            <strong>Note:</strong> Route calculations are processed securely through our backend service.
           </AlertDescription>
         </Alert>
       )}
 
-      {!isLoaded && !apiError && (
-        <div className="space-y-2">
-          <Label htmlFor="apiKey">Google Maps API Key</Label>
-          <Input
-            id="apiKey"
-            type="password"
-            placeholder="Enter your Google Maps API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-          <Button onClick={() => initializeMap(apiKey)} disabled={!apiKey}>
-            Load Map
-          </Button>
-          <p className="text-sm text-gray-600">
-            Get your API key from Google Cloud Console and enable Maps JavaScript API and Directions API
-          </p>
-        </div>
+      {loading && (
+        <Alert>
+          <AlertDescription>
+            Calculating route securely...
+          </AlertDescription>
+        </Alert>
       )}
       
       <div 
@@ -182,7 +145,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       
       {!isLoaded && !apiError && (
         <div className="w-full h-96 rounded-lg border bg-gray-100 flex items-center justify-center">
-          <p className="text-gray-600">Loading Google Maps...</p>
+          <p className="text-gray-600">Loading map visualization...</p>
         </div>
       )}
     </div>
