@@ -11,6 +11,7 @@ import { MapPin, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useCSRF } from '@/components/CSRFProtection';
+import { SECURITY_CONFIG } from '@/config/security';
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -84,10 +85,10 @@ const Auth = () => {
     }
 
     // Password strength validation for sign up
-    if (isSignUp && password.length < 8) {
+    if (isSignUp && password.length < SECURITY_CONFIG.MIN_PASSWORD_LENGTH) {
       toast({
         title: "Weak Password",
-        description: "Password must be at least 8 characters long.",
+        description: `Password must be at least ${SECURITY_CONFIG.MIN_PASSWORD_LENGTH} characters long.`,
         variant: "destructive"
       });
       return;
@@ -101,7 +102,7 @@ const Auth = () => {
       if (isSignUp) {
         logSecurityEvent({
           event_type: 'USER_SIGNUP_ATTEMPT',
-          severity: 'low',
+          severity: '***',
           details: {
             email: email.substring(0, email.indexOf('@')) + '@***',
             hasFullName: !!fullName,
@@ -250,7 +251,7 @@ const Auth = () => {
                   value={fullName}
                   onChange={(e) => handleInputChange(e.target.value, 'fullName', setFullName)}
                   required={isSignUp}
-                  maxLength={100}
+                  maxLength={SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH}
                   autoComplete="name"
                 />
               </div>
@@ -265,7 +266,7 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => handleInputChange(e.target.value, 'email', setEmail)}
                 required
-                maxLength={254}
+                maxLength={SECURITY_CONFIG.MAX_EMAIL_LENGTH}
                 autoComplete="email"
               />
             </div>
@@ -279,12 +280,12 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={isSignUp ? 8 : 1}
+                minLength={isSignUp ? SECURITY_CONFIG.MIN_PASSWORD_LENGTH : 1}
                 autoComplete={isSignUp ? "new-password" : "current-password"}
               />
               {isSignUp && (
                 <p className="text-xs text-gray-600">
-                  Password must be at least 8 characters long
+                  Password must be at least {SECURITY_CONFIG.MIN_PASSWORD_LENGTH} characters long
                 </p>
               )}
             </div>

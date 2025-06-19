@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CSRFProvider } from "@/components/CSRFProtection";
+import SecurityHeaders from "@/components/SecurityHeaders";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import TravelPlanner from "./pages/TravelPlanner";
@@ -20,6 +21,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <CSRFProvider>
+        <SecurityHeaders />
         <TooltipProvider>
           <Toaster />
           <Sonner />

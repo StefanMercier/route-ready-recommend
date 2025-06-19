@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { SECURITY_CONFIG, detectXSSAttempt, sanitizeInput } from '@/config/security';
 
 interface SecurityEvent {
   event_type: string;
@@ -34,7 +35,6 @@ export const useSecurityMonitoring = () => {
         
         // Could trigger immediate security measures
         if (event.event_type === 'MULTIPLE_FAILED_LOGINS' || event.event_type === 'XSS_ATTEMPT') {
-          // Implement temporary user restrictions or CAPTCHA
           console.warn('Implementing security restrictions due to:', event.event_type);
         }
       }
@@ -55,8 +55,8 @@ export const useSecurityMonitoring = () => {
   };
 
   const monitorFailedLoginAttempts = () => {
-    const maxAttempts = 5;
-    const timeWindow = 15 * 60 * 1000; // 15 minutes
+    const maxAttempts = SECURITY_CONFIG.MAX_FAILED_LOGIN_ATTEMPTS;
+    const timeWindow = SECURITY_CONFIG.LOGIN_LOCKOUT_DURATION;
     const clientId = navigator.userAgent + window.location.origin;
     
     return {
@@ -83,7 +83,7 @@ export const useSecurityMonitoring = () => {
               clientId: clientId.substring(0, 50) + '...'
             }
           });
-          return true; // Account should be temporarily locked
+          return true;
         }
         
         return false;
@@ -137,45 +137,27 @@ export const useSecurityMonitoring = () => {
   };
 
   const detectSuspiciousActivity = (userAction: string, context: Record<string, any>) => {
-    // Enhanced suspicious activity detection patterns
-    const suspiciousPatterns = [
-      /script\s*:/i,
-      /<script/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /data:/i,
-      /on\w+\s*=/i,
-      /\x00-\x1f/,
-      /eval\s*\(/i,
-      /document\.(write|cookie)/i,
-      /window\.(location|open)/i,
-      /(alert|confirm|prompt)\s*\(/i
-    ];
-
     const inputValues = Object.values(context).join(' ');
-    const suspiciousMatches = suspiciousPatterns.filter(pattern => pattern.test(inputValues));
-    const isSuspicious = suspiciousMatches.length > 0;
-
+    const hasXSS = detectXSSAttempt(inputValues);
+    
     // Track frequency of suspicious activity
     const sessionId = sessionStorage.getItem('session_id') || 'anonymous';
     const currentCount = suspiciousActivityRef.current.get(sessionId) || 0;
     
-    if (isSuspicious) {
+    if (hasXSS) {
       const newCount = currentCount + 1;
       suspiciousActivityRef.current.set(sessionId, newCount);
       
-      let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
       if (newCount >= 5) severity = 'critical';
       else if (newCount >= 3) severity = 'high';
-      else if (suspiciousMatches.length > 2) severity = 'medium';
 
       logSecurityEvent({
-        event_type: 'SUSPICIOUS_ACTIVITY',
+        event_type: 'XSS_ATTEMPT',
         severity,
         details: {
           action: userAction,
           context: context,
-          matchedPatterns: suspiciousMatches.map(p => p.toString()),
           suspiciousCount: newCount,
           timestamp: new Date().toISOString()
         }
@@ -183,85 +165,46 @@ export const useSecurityMonitoring = () => {
 
       // Implement progressive restrictions
       if (severity === 'critical') {
-        // Could implement CAPTCHA or temporary account restrictions
-        console.warn('Critical suspicious activity detected - implementing restrictions');
+        console.warn('Critical XSS attempt detected - implementing restrictions');
       }
     }
 
     return {
-      isSuspicious,
-      severity: isSuspicious ? (currentCount >= 5 ? 'critical' : currentCount >= 3 ? 'high' : 'medium') : 'low',
-      matchedPatterns: suspiciousMatches.length
-    };
-  };
-
-  const monitorPageActivity = () => {
-    const startTime = Date.now();
-    
-    return () => {
-      const timeSpent = Date.now() - startTime;
-      
-      // Log unusual page behavior
-      if (timeSpent < 1000) { // Less than 1 second
-        logSecurityEvent({
-          event_type: 'RAPID_PAGE_INTERACTION',
-          severity: 'low',
-          details: {
-            timeSpent,
-            url: window.location.href
-          }
-        });
-      }
+      isSuspicious: hasXSS,
+      severity: hasXSS ? (currentCount >= 5 ? 'critical' : currentCount >= 3 ? 'high' : 'medium') : 'low',
+      hasXSS
     };
   };
 
   // Enhanced input validation with security checks
   const validateAndSanitizeInput = (input: string, fieldName: string): { sanitized: string; isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
-    let sanitized = input;
-
+    
     if (!input || typeof input !== 'string') {
       return { sanitized: '', isValid: false, errors: ['Invalid input type'] };
     }
 
     // Length validation
-    if (input.length > 1000) {
+    const maxLength = fieldName === 'email' ? SECURITY_CONFIG.MAX_EMAIL_LENGTH : SECURITY_CONFIG.MAX_INPUT_LENGTH;
+    if (input.length > maxLength) {
       errors.push('Input too long');
-      sanitized = input.substring(0, 1000);
     }
 
-    // XSS prevention
-    const xssPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /on\w+\s*=/i,
-      /data:/i
-    ];
-
-    for (const pattern of xssPatterns) {
-      if (pattern.test(sanitized)) {
-        errors.push('Potentially malicious content detected');
-        logSecurityEvent({
-          event_type: 'XSS_ATTEMPT',
-          severity: 'high',
-          details: {
-            fieldName,
-            input: input.substring(0, 100) + '...',
-            pattern: pattern.toString()
-          }
-        });
-      }
+    // XSS detection
+    if (detectXSSAttempt(input)) {
+      errors.push('Potentially malicious content detected');
+      logSecurityEvent({
+        event_type: 'XSS_ATTEMPT',
+        severity: 'high',
+        details: {
+          fieldName,
+          input: input.substring(0, 100) + '...'
+        }
+      });
     }
 
-    // Basic sanitization
-    sanitized = sanitized
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-      .replace(/vbscript:/gi, '') // Remove vbscript: protocol
-      .replace(/data:/gi, '') // Remove data: protocol
-      .replace(/on\w+\s*=/gi, '') // Remove event handlers
-      .trim();
+    // Sanitize the input
+    const sanitized = sanitizeInput(input, maxLength);
 
     return {
       sanitized,
@@ -272,7 +215,7 @@ export const useSecurityMonitoring = () => {
 
   // Set up page monitoring
   useEffect(() => {
-    const cleanup = monitorPageActivity();
+    const startTime = Date.now();
     
     // Monitor for rapid form submissions
     let lastSubmission = 0;
@@ -294,7 +237,20 @@ export const useSecurityMonitoring = () => {
     document.addEventListener('submit', handleFormSubmit);
     
     return () => {
-      cleanup();
+      const timeSpent = Date.now() - startTime;
+      
+      // Log unusual page behavior
+      if (timeSpent < 1000) { // Less than 1 second
+        logSecurityEvent({
+          event_type: 'RAPID_PAGE_INTERACTION',
+          severity: 'low',
+          details: {
+            timeSpent,
+            url: window.location.href
+          }
+        });
+      }
+      
       document.removeEventListener('submit', handleFormSubmit);
     };
   }, []);

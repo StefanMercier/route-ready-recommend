@@ -8,6 +8,7 @@ import { MapPin, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useCSRF } from '@/components/CSRFProtection';
+import { sanitizeInput, detectXSSAttempt, SECURITY_CONFIG } from '@/config/security';
 
 interface RouteInputFormProps {
   departure: string;
@@ -18,61 +19,24 @@ interface RouteInputFormProps {
   onCalculate: () => void;
 }
 
-// Enhanced input validation and sanitization
-const sanitizeInput = (input: string): string => {
-  if (!input) return '';
-  
-  // Trim whitespace
-  let sanitized = input.trim();
-  
-  // Remove potentially dangerous characters with enhanced XSS prevention
-  sanitized = sanitized.replace(/<[^>]*>/g, ''); // Remove HTML tags
-  sanitized = sanitized.replace(/javascript:/gi, ''); // Remove javascript: protocol
-  sanitized = sanitized.replace(/vbscript:/gi, ''); // Remove vbscript: protocol
-  sanitized = sanitized.replace(/data:/gi, ''); // Remove data: protocol
-  sanitized = sanitized.replace(/on\w+\s*=/gi, ''); // Remove event handlers
-  sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, ''); // Remove control characters
-  sanitized = sanitized.replace(/[<>"'&]/g, ''); // Remove dangerous HTML characters
-  
-  // Limit length
-  if (sanitized.length > 100) {
-    sanitized = sanitized.substring(0, 100);
-  }
-  
-  return sanitized;
-};
-
 const validateInput = (input: string): { isValid: boolean; error?: string } => {
   if (!input || input.trim().length === 0) {
     return { isValid: false, error: 'This field is required' };
   }
   
-  if (input.length > 100) {
-    return { isValid: false, error: 'Input is too long (maximum 100 characters)' };
+  if (input.length > SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH) {
+    return { isValid: false, error: `Input is too long (maximum ${SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH} characters)` };
   }
   
-  // Enhanced validation patterns
-  const dangerousPatterns = [
-    /<script/i,
-    /javascript:/i,
-    /vbscript:/i,
-    /data:/i,
-    /on\w+\s*=/i,
-    /\x00-\x1f/,
-    /[\<\>\"\'&]/
-  ];
-  
-  // Basic validation for postal codes and addresses
-  const sanitized = sanitizeInput(input);
-  if (sanitized !== input) {
+  // Enhanced XSS detection
+  if (detectXSSAttempt(input)) {
     return { isValid: false, error: 'Invalid characters detected' };
   }
   
-  // Check for suspicious patterns
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(input)) {
-      return { isValid: false, error: 'Invalid input detected' };
-    }
+  // Basic postal code/address validation
+  const sanitized = sanitizeInput(input, SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH);
+  if (sanitized !== input) {
+    return { isValid: false, error: 'Invalid characters detected' };
   }
   
   return { isValid: true };
@@ -93,9 +57,9 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
 
   const handleDepartureChange = (value: string) => {
     // Security monitoring
-    detectSuspiciousActivity('input_change', { field: 'departure', value });
+    detectSuspiciousActivity('input_change', { field: 'departure', value: value.substring(0, 20) + '...' });
     
-    const sanitized = sanitizeInput(value);
+    const sanitized = sanitizeInput(value, SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH);
     const validation = validateInput(sanitized);
     
     setDepartureError(validation.error || '');
@@ -104,9 +68,9 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
 
   const handleDestinationChange = (value: string) => {
     // Security monitoring
-    detectSuspiciousActivity('input_change', { field: 'destination', value });
+    detectSuspiciousActivity('input_change', { field: 'destination', value: value.substring(0, 20) + '...' });
     
-    const sanitized = sanitizeInput(value);
+    const sanitized = sanitizeInput(value, SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH);
     const validation = validateInput(sanitized);
     
     setDestinationError(validation.error || '');
@@ -168,7 +132,7 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
                 value={departure}
                 onChange={(e) => handleDepartureChange(e.target.value)}
                 className={departureError ? 'border-red-500' : ''}
-                maxLength={100}
+                maxLength={SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH}
                 autoComplete="off"
                 spellCheck="false"
               />
@@ -188,7 +152,7 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
                 value={destination}
                 onChange={(e) => handleDestinationChange(e.target.value)}
                 className={destinationError ? 'border-red-500' : ''}
-                maxLength={100}
+                maxLength={SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH}
                 autoComplete="off"
                 spellCheck="false"
               />
