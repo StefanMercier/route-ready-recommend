@@ -1,6 +1,5 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,44 +12,10 @@ interface GoogleMapProps {
 
 const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanceCalculated }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Initialize map with a public demo key for visualization only
-  const initializeMap = async () => {
-    if (!mapRef.current) return;
-
-    try {
-      setApiError(null);
-      const loader = new Loader({
-        apiKey: 'AIzaSyBHo7mGrIVcmsDE_QjKaB4QjNn3emmSPSI', // Public demo key for map display only
-        version: 'weekly',
-        libraries: ['places']
-      });
-
-      await loader.load();
-
-      const mapInstance = new google.maps.Map(mapRef.current, {
-        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
-        zoom: 4,
-      });
-
-      const directionsRendererInstance = new google.maps.DirectionsRenderer();
-      directionsRendererInstance.setMap(mapInstance);
-
-      setMap(mapInstance);
-      setDirectionsRenderer(directionsRendererInstance);
-      setIsLoaded(true);
-    } catch (error) {
-      console.error('Error loading Google Maps:', error);
-      setApiError('Failed to load Google Maps for visualization.');
-    }
-  };
-
-  // Use secure edge function for route calculations
+  // Use secure edge function for all route calculations and map display
   const calculateRouteSecurely = async () => {
     if (!departure || !destination) return;
 
@@ -77,24 +42,6 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       if (data && data.status === 'OK') {
         console.log('Route calculated successfully:', data);
         onDistanceCalculated(data.distanceInMiles, data.durationInHours);
-        
-        // Display route on map if available (for visualization only)
-        if (directionsRenderer && window.google) {
-          // This is just for visual representation, actual calculation is done securely
-          const directionsService = new google.maps.DirectionsService();
-          directionsService.route(
-            {
-              origin: departure,
-              destination: destination,
-              travelMode: google.maps.TravelMode.DRIVING,
-            },
-            (result, status) => {
-              if (status === 'OK' && result) {
-                directionsRenderer.setDirections(result);
-              }
-            }
-          );
-        }
       } else {
         setApiError(data?.error || 'Failed to calculate route');
       }
@@ -107,14 +54,10 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   };
 
   useEffect(() => {
-    initializeMap();
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded && departure && destination) {
+    if (departure && destination) {
       calculateRouteSecurely();
     }
-  }, [isLoaded, departure, destination]);
+  }, [departure, destination]);
 
   return (
     <div className="space-y-4">
@@ -124,7 +67,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           <AlertDescription>
             {apiError}
             <br />
-            <strong>Note:</strong> Route calculations are processed securely through our backend service.
+            <strong>Note:</strong> All route calculations are processed securely through our backend service.
           </AlertDescription>
         </Alert>
       )}
@@ -137,17 +80,14 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         </Alert>
       )}
       
-      <div 
-        ref={mapRef} 
-        className="w-full h-96 rounded-lg border"
-        style={{ display: isLoaded ? 'block' : 'none' }}
-      />
-      
-      {!isLoaded && !apiError && (
-        <div className="w-full h-96 rounded-lg border bg-gray-100 flex items-center justify-center">
-          <p className="text-gray-600">Loading map visualization...</p>
+      <div className="w-full h-96 rounded-lg border bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-2">Secure Route Calculation</p>
+          <p className="text-sm text-gray-500">
+            All map data and routing is processed through our secure backend
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 };
