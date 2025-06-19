@@ -1,4 +1,5 @@
 
+
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SECURITY_CONFIG, detectXSSAttempt, sanitizeInput } from '@/config/security';
@@ -186,7 +187,7 @@ export const useSecurityMonitoring = () => {
     }
 
     // Length validation - using appropriate max length based on field type
-    let maxLength = SECURITY_CONFIG.MAX_INPUT_LENGTH;
+    let maxLength: number = SECURITY_CONFIG.MAX_INPUT_LENGTH;
     if (fieldName === 'email') {
       maxLength = SECURITY_CONFIG.MAX_EMAIL_LENGTH;
     } else if (fieldName === 'departure' || fieldName === 'destination' || fieldName === 'fullName') {
@@ -270,3 +271,4 @@ export const useSecurityMonitoring = () => {
     validateAndSanitizeInput
   };
 };
+
