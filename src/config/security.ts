@@ -51,8 +51,8 @@ export const SECURITY_CONFIG = {
   }
 } as const;
 
-// Enhanced input sanitization utility
-export const sanitizeInput = (input: string, maxLength = SECURITY_CONFIG.MAX_INPUT_LENGTH): string => {
+// Enhanced input sanitization utility - updated to accept any number for maxLength
+export const sanitizeInput = (input: string, maxLength: number = SECURITY_CONFIG.MAX_INPUT_LENGTH): string => {
   if (!input || typeof input !== 'string') return '';
   
   let sanitized = input.trim();

@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SECURITY_CONFIG, detectXSSAttempt, sanitizeInput } from '@/config/security';
@@ -176,7 +177,7 @@ export const useSecurityMonitoring = () => {
     };
   };
 
-  // Enhanced input validation with security checks
+  // Enhanced input validation with security checks - fixed maxLength parameter
   const validateAndSanitizeInput = (input: string, fieldName: string): { sanitized: string; isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
     
@@ -184,8 +185,14 @@ export const useSecurityMonitoring = () => {
       return { sanitized: '', isValid: false, errors: ['Invalid input type'] };
     }
 
-    // Length validation
-    const maxLength = fieldName === 'email' ? SECURITY_CONFIG.MAX_EMAIL_LENGTH : SECURITY_CONFIG.MAX_INPUT_LENGTH;
+    // Length validation - using appropriate max length based on field type
+    let maxLength = SECURITY_CONFIG.MAX_INPUT_LENGTH;
+    if (fieldName === 'email') {
+      maxLength = SECURITY_CONFIG.MAX_EMAIL_LENGTH;
+    } else if (fieldName === 'departure' || fieldName === 'destination' || fieldName === 'fullName') {
+      maxLength = SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH;
+    }
+
     if (input.length > maxLength) {
       errors.push('Input too long');
     }

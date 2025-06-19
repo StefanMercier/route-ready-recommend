@@ -102,7 +102,7 @@ const Auth = () => {
       if (isSignUp) {
         logSecurityEvent({
           event_type: 'USER_SIGNUP_ATTEMPT',
-          severity: '***',
+          severity: 'low',
           details: {
             email: email.substring(0, email.indexOf('@')) + '@***',
             hasFullName: !!fullName,
