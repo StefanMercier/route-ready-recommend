@@ -17,10 +17,20 @@ interface User {
   created_at: string;
 }
 
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  target_user_id: string | null;
+  details: any;
+  created_at: string;
+}
+
 const AdminPanel = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -29,6 +39,7 @@ const AdminPanel = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
+      fetchAuditLogs();
     }
   }, [isAdmin]);
 
@@ -41,7 +52,8 @@ const AdminPanel = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
+      // Use the new is_admin_user function
+      const { data, error } = await supabase.rpc('is_admin_user', { user_id: user.id });
       if (!error) {
         setIsAdmin(data);
       } else {
@@ -75,6 +87,21 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_audit_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setAuditLogs(data || []);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+    }
+  };
+
   const togglePaymentStatus = async (userId: string, currentStatus: boolean, userEmail: string) => {
     if (!isAdmin) {
       toast({
@@ -86,12 +113,33 @@ const AdminPanel = () => {
     }
 
     try {
+      // Validate and sanitize the email input using the new validation function
+      const { data: sanitizedEmail, error: validationError } = await supabase.rpc('validate_and_sanitize_input', {
+        input_text: userEmail,
+        max_length: 255
+      });
+
+      if (validationError) {
+        throw new Error(`Input validation failed: ${validationError.message}`);
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ has_paid: !currentStatus })
         .eq('id', userId);
 
       if (error) throw error;
+
+      // Log the admin action using the secure logging function
+      await supabase.rpc('log_admin_action', {
+        action_type: 'payment_status_changed',
+        target_user: userId,
+        action_details: {
+          old_status: currentStatus,
+          new_status: !currentStatus,
+          target_email: sanitizedEmail
+        }
+      });
 
       setUsers(users.map(user => 
         user.id === userId 
@@ -101,8 +149,11 @@ const AdminPanel = () => {
 
       toast({
         title: "Success",
-        description: `Payment status updated for ${userEmail}`,
+        description: `Payment status updated for ${sanitizedEmail}`,
       });
+
+      // Refresh audit logs
+      fetchAuditLogs();
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast({
@@ -188,6 +239,51 @@ const AdminPanel = () => {
           </Card>
         </div>
 
+        <div className="flex gap-4">
+          <Button
+            variant={showAuditLogs ? "default" : "outline"}
+            onClick={() => setShowAuditLogs(!showAuditLogs)}
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            {showAuditLogs ? "Hide" : "Show"} Audit Logs
+          </Button>
+        </div>
+
+        {showAuditLogs && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Audit Log</CardTitle>
+              <CardDescription>
+                Recent admin actions and system events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-3 border rounded-lg text-sm">
+                    <div className="flex justify-between items-start">
+                      <span className="font-medium">{log.action}</span>
+                      <span className="text-gray-500">
+                        {new Date(log.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {log.details && (
+                      <div className="mt-1 text-gray-600">
+                        <pre className="whitespace-pre-wrap text-xs">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {auditLogs.length === 0 && (
+                  <p className="text-gray-500 text-center py-4">No audit logs found</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>User Management</CardTitle>
@@ -226,6 +322,9 @@ const AdminPanel = () => {
                   </div>
                 </div>
               ))}
+              {users.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No users found</p>
+              )}
             </div>
           </CardContent>
         </Card>
