@@ -1,3 +1,4 @@
+
 interface SecurityEvent {
   event_type: string;
   user_id?: string;
@@ -5,6 +6,7 @@ interface SecurityEvent {
   user_agent?: string;
   details?: Record<string, any>;
   severity?: 'low' | 'medium' | 'high' | 'critical';
+  timestamp?: string;
 }
 
 // Security event categories for better monitoring
@@ -84,9 +86,10 @@ export const logSecurityEvent = async (event: SecurityEvent) => {
 
 // Pattern detection for advanced security monitoring
 const detectSecurityPatterns = async (events: SecurityEvent[]) => {
-  const recentEvents = events.filter(e => 
-    Date.now() - new Date(e.timestamp || 0).getTime() < 300000 // Last 5 minutes
-  );
+  const recentEvents = events.filter(e => {
+    const eventTime = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+    return Date.now() - eventTime < 300000; // Last 5 minutes
+  });
 
   // Detect multiple XSS attempts
   const xssAttempts = recentEvents.filter(e => e.event_type === 'XSS_ATTEMPT').length;
