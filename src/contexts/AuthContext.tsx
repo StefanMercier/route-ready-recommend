@@ -58,12 +58,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    // Use production URL if available, otherwise fall back to current origin
-    const baseUrl = window.location.hostname.includes('lovable.app') 
-      ? window.location.origin 
-      : 'https://gklfrynehiqrwbddvaaa.supabase.co';
+    // Determine the correct redirect URL based on environment
+    let redirectUrl = window.location.origin;
     
-    const redirectUrl = `${baseUrl}/`;
+    // For Lovable preview URLs, use the current origin
+    if (window.location.hostname.includes('lovable.app')) {
+      redirectUrl = window.location.origin;
+    }
+    // For localhost development, use localhost
+    else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      redirectUrl = window.location.origin;
+    }
+    // For production domains, use the current origin
+    else {
+      redirectUrl = window.location.origin;
+    }
     
     const { error } = await supabase.auth.signUp({
       email,

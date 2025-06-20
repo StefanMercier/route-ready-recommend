@@ -60,7 +60,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          email: string | null
+          email: string
           full_name: string | null
           has_paid: boolean
           id: string
@@ -68,7 +68,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          email?: string | null
+          email: string
           full_name?: string | null
           has_paid?: boolean
           id: string
@@ -76,7 +76,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          email?: string | null
+          email?: string
           full_name?: string | null
           has_paid?: boolean
           id?: string
@@ -109,9 +109,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      owns_profile: {
+        Args: { profile_id: string }
+        Returns: boolean
+      }
       validate_and_sanitize_input: {
         Args: { input_text: string; max_length?: number }
         Returns: string
+      }
+      validate_email: {
+        Args: { email_input: string }
+        Returns: boolean
       }
     }
     Enums: {
