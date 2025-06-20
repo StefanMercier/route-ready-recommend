@@ -10,6 +10,8 @@ import UserMenu from '@/components/UserMenu';
 import PaymentGate from '@/components/PaymentGate';
 import { usePaymentStatus } from '@/hooks/usePaymentStatus';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -26,6 +28,10 @@ const TravelPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TravelCalculation | null>(null);
   const [useRealDistance, setUseRealDistance] = useState(false);
+  const [anonymousUsageCount, setAnonymousUsageCount] = useState(0);
+  
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { hasPaid, loading: paymentLoading } = usePaymentStatus();
   const { 
     usageCount, 
@@ -62,8 +68,8 @@ const TravelPlanner = () => {
   };
 
   const handleDistanceCalculated = async (distance: number, duration: number) => {
-    // For paid users, don't increment usage
-    if (!hasPaid) {
+    // Handle usage increment for authenticated users
+    if (user && !hasPaid) {
       const success = await incrementUsage();
       if (!success) {
         toast({
@@ -104,8 +110,19 @@ const TravelPlanner = () => {
       return;
     }
 
-    // Check usage limit for non-paid users
-    if (!hasPaid && hasReachedLimit) {
+    // Check if user needs to authenticate (6th calculation for anonymous users)
+    if (!user && anonymousUsageCount >= 5) {
+      toast({
+        title: "Sign In Required",
+        description: "Please create an account to continue using the travel planner.",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+
+    // Check usage limit for authenticated non-paid users
+    if (user && !hasPaid && hasReachedLimit) {
       toast({
         title: "Usage Limit Reached",
         description: "You've reached your free usage limit. Please upgrade to continue.",
@@ -117,8 +134,8 @@ const TravelPlanner = () => {
     setLoading(true);
     
     try {
-      // For non-paid users, increment usage on demo calculation
-      if (!hasPaid) {
+      // Increment usage for authenticated users
+      if (user && !hasPaid) {
         const success = await incrementUsage();
         if (!success) {
           toast({
@@ -131,15 +148,24 @@ const TravelPlanner = () => {
         }
       }
 
+      // Increment anonymous usage count
+      if (!user) {
+        setAnonymousUsageCount(prev => prev + 1);
+      }
+
       // For demo purposes when Google Maps is not loaded
       const mockDistance = Math.floor(Math.random() * 800) + 100;
       const calculation = calculateTravelTime(mockDistance);
       setResult(calculation);
       setUseRealDistance(false);
       
-      const usageMessage = hasPaid 
-        ? "Load Google Maps for real data."
-        : `Remaining free calculations: ${remainingUses - 1}. Load Google Maps for real data.`;
+      let usageMessage = "Load Google Maps for real data.";
+      if (!user) {
+        const remaining = 5 - anonymousUsageCount;
+        usageMessage = `${remaining} free calculations remaining. Load Google Maps for real data.`;
+      } else if (!hasPaid) {
+        usageMessage = `Remaining free calculations: ${remainingUses - 1}. Load Google Maps for real data.`;
+      }
       
       toast({
         title: "Calculation Complete (Demo)",
@@ -156,7 +182,7 @@ const TravelPlanner = () => {
     }
   };
 
-  if (paymentLoading || usageLoading) {
+  if (paymentLoading || (user && usageLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -167,21 +193,39 @@ const TravelPlanner = () => {
     );
   }
 
-  return (
-    <PaymentGate 
-      hasPaid={hasPaid} 
-      hasReachedLimit={hasReachedLimit}
-      remainingUses={remainingUses}
-    >
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex justify-between items-center">
-            <TravelBanner />
-            <UserMenu />
-          </div>
+  // Show PaymentGate only for authenticated users who have reached their limit
+  if (user && !hasPaid && hasReachedLimit) {
+    return (
+      <PaymentGate 
+        hasPaid={hasPaid} 
+        hasReachedLimit={hasReachedLimit}
+        remainingUses={remainingUses}
+      >
+        {/* This won't render due to hasReachedLimit being true */}
+      </PaymentGate>
+    );
+  }
 
-          {/* Usage indicator for non-paid users */}
-          {!hasPaid && (
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <TravelBanner />
+      {user && <UserMenu />}
+      
+      <div className="p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Usage indicator */}
+          {!user && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <p className="text-blue-800">
+                <span className="font-medium">Free calculations remaining: {5 - anonymousUsageCount}</span>
+                {anonymousUsageCount >= 4 && (
+                  <span className="block text-sm mt-1">Create an account to continue after this calculation!</span>
+                )}
+              </p>
+            </div>
+          )}
+          
+          {user && !hasPaid && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
               <p className="text-blue-800">
                 <span className="font-medium">Free calculations remaining: {remainingUses}</span>
@@ -215,7 +259,7 @@ const TravelPlanner = () => {
           )}
         </div>
       </div>
-    </PaymentGate>
+    </div>
   );
 };
 

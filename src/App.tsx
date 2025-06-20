@@ -38,14 +38,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route 
-                path="/planner" 
-                element={
-                  <ProtectedRoute>
-                    <TravelPlanner />
-                  </ProtectedRoute>
-                } 
-              />
+              <Route path="/planner" element={<TravelPlanner />} />
               <Route 
                 path="/payment-success" 
                 element={

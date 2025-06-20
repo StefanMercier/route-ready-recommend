@@ -27,20 +27,22 @@ const UserMenu: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <User className="h-4 w-4" />
-        <span>{user.email}</span>
+    <div className="w-full bg-gray-50 border-b py-3">
+      <div className="max-w-4xl mx-auto px-4 flex justify-end items-center gap-4">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <User className="h-4 w-4" />
+          <span>{user.email}</span>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleSignOut}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
       </div>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={handleSignOut}
-        className="flex items-center gap-2"
-      >
-        <LogOut className="h-4 w-4" />
-        Sign Out
-      </Button>
     </div>
   );
 };
