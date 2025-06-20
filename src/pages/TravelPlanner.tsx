@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { validateZipCode } from '@/services/distanceService';
@@ -201,7 +200,7 @@ const TravelPlanner = () => {
         hasReachedLimit={hasReachedLimit}
         remainingUses={remainingUses}
       >
-        {/* This won't render due to hasReachedLimit being true */}
+        <div /> {/* Empty children to satisfy the prop requirement */}
       </PaymentGate>
     );
   }
@@ -209,7 +208,7 @@ const TravelPlanner = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <TravelBanner />
-      {user && <UserMenu />}
+      <UserMenu />
       
       <div className="p-4">
         <div className="max-w-4xl mx-auto space-y-6">
