@@ -93,10 +93,6 @@ export type Database = {
         Args: { target_email: string }
         Returns: boolean
       }
-      is_admin: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
       is_admin_user: {
         Args: { user_id?: string }
         Returns: boolean

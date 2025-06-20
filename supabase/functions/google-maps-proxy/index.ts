@@ -1,136 +1,171 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://gklfrynehiqrwbddvaaa.supabase.co',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+  "X-Rate-Limit-Remaining": "100",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
+};
+
+// Rate limiting storage
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const isRateLimited = (clientIP: string): boolean => {
+  const now = Date.now();
+  const limit = rateLimitMap.get(clientIP);
+  
+  if (!limit || now > limit.resetTime) {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + 60000 }); // 1 minute window
+    return false;
+  }
+  
+  if (limit.count >= 30) { // 30 requests per minute
+    return true;
+  }
+  
+  limit.count++;
+  return false;
+};
+
+const validateInput = (input: string, maxLength: number = 100): string => {
+  if (!input || typeof input !== 'string') {
+    throw new Error('Invalid input');
+  }
+  
+  const trimmed = input.trim();
+  if (trimmed.length > maxLength) {
+    throw new Error(`Input too long: maximum ${maxLength} characters`);
+  }
+  
+  // Remove potentially dangerous characters
+  const sanitized = trimmed.replace(/[<>\"'&]/g, '');
+  
+  if (sanitized !== trimmed) {
+    throw new Error('Input contains invalid characters');
+  }
+  
+  return sanitized;
+};
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Validate request method
-    if (req.method !== 'POST') {
+    // Rate limiting
+    const clientIP = req.headers.get("x-forwarded-for") || "unknown";
+    if (isRateLimited(clientIP)) {
       return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
+        JSON.stringify({ error: "Rate limit exceeded" }), 
         { 
-          status: 405, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          status: 429, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
-      )
+      );
     }
 
-    const { origin, destination, travelMode = 'DRIVING' } = await req.json()
+    const url = new URL(req.url);
+    const service = validateInput(url.searchParams.get("service") || "");
     
-    // Get the Google Maps API key from Supabase secrets
-    const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
-    
-    if (!googleMapsApiKey) {
-      console.error('Google Maps API key not found in environment variables')
+    if (!service) {
       return new Response(
-        JSON.stringify({ error: 'Google Maps API key not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Validate required parameters
-    if (!origin || !destination) {
-      return new Response(
-        JSON.stringify({ error: 'Origin and destination are required' }),
+        JSON.stringify({ error: "Service parameter required" }), 
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
-      )
+      );
     }
 
-    // Input sanitization
-    const sanitizedOrigin = origin.toString().substring(0, 100)
-    const sanitizedDestination = destination.toString().substring(0, 100)
-    const sanitizedTravelMode = ['DRIVING', 'WALKING', 'BICYCLING', 'TRANSIT'].includes(travelMode) 
-      ? travelMode : 'DRIVING'
+    // Validate allowed services
+    const allowedServices = ["directions", "geocoding", "places"];
+    if (!allowedServices.includes(service)) {
+      return new Response(
+        JSON.stringify({ error: "Service not allowed" }), 
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
-    // Construct the Google Maps API URL for directions
-    const googleMapsUrl = `https://maps.googleapis.com/maps/api/directions/json?` +
-      `origin=${encodeURIComponent(sanitizedOrigin)}&` +
-      `destination=${encodeURIComponent(sanitizedDestination)}&` +
-      `mode=${sanitizedTravelMode.toLowerCase()}&` +
-      `key=${googleMapsApiKey}`
+    const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    if (!apiKey) {
+      console.error("Google Maps API key not configured");
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable" }), 
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
-    console.log('Making secure request to Google Maps API for directions')
+    // Build Google Maps API URL with validation
+    const googleUrl = new URL(`https://maps.googleapis.com/maps/api/${service}/json`);
     
-    // Make the request to Google Maps API
-    const response = await fetch(googleMapsUrl)
-    const data = await response.json()
+    // Copy and validate query parameters
+    for (const [key, value] of url.searchParams.entries()) {
+      if (key !== "service") {
+        try {
+          const validatedValue = validateInput(value, 200);
+          googleUrl.searchParams.set(key, validatedValue);
+        } catch (error) {
+          return new Response(
+            JSON.stringify({ error: "Invalid parameter format" }), 
+            { 
+              status: 400, 
+              headers: { ...corsHeaders, "Content-Type": "application/json" } 
+            }
+          );
+        }
+      }
+    }
     
-    if (!response.ok || data.status !== 'OK') {
-      console.error('Google Maps API error:', data)
+    googleUrl.searchParams.set("key", apiKey);
+
+    const response = await fetch(googleUrl.toString(), {
+      method: req.method,
+      headers: {
+        "User-Agent": "TripStrs-Proxy/1.0"
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Google Maps API error: ${response.status}`);
       return new Response(
-        JSON.stringify({ 
-          error: 'Unable to calculate route', 
-          status: data.status || 'UNKNOWN_ERROR' 
-        }),
+        JSON.stringify({ error: "External service error" }), 
         { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          status: 502, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
-      )
+      );
     }
 
-    // Extract route information securely
-    const route = data.routes?.[0]
-    if (!route) {
-      return new Response(
-        JSON.stringify({ error: 'No route found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    const leg = route.legs?.[0]
-    if (!leg) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid route data' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Convert to miles and hours for consistency
-    const distanceInMiles = Math.round((leg.distance?.value || 0) * 0.000621371 * 100) / 100
-    const durationInHours = Math.round((leg.duration?.value || 0) / 3600 * 100) / 100
-
-    const secureResponse = {
-      status: 'OK',
-      distanceInMiles,
-      durationInHours,
-      distanceText: leg.distance?.text || 'Unknown',
-      durationText: leg.duration?.text || 'Unknown'
-    }
-
-    return new Response(JSON.stringify(secureResponse), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    const data = await response.json();
+    
+    return new Response(JSON.stringify(data), {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=300" // 5 minutes cache
+      }
+    });
 
   } catch (error) {
-    console.error('Error in Google Maps proxy:', error)
+    console.error("Proxy error:", error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: "Internal server error" }), 
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
-    )
+    );
   }
-})
+});
