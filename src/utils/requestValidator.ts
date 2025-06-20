@@ -1,12 +1,6 @@
 
 import { logSecurityEvent } from './securityEventLogger';
-
-const ALLOWED_ORIGINS = [
-  'https://gklfrynehiqrwbddvaaa.supabase.co',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'https://localhost:3000'
-];
+import { SECURITY_CONFIG } from '@/config/security';
 
 // Enhanced origin validation with environment detection
 export const validateRequestOrigin = (expectedOrigin?: string): boolean => {
@@ -14,17 +8,12 @@ export const validateRequestOrigin = (expectedOrigin?: string): boolean => {
   
   const currentOrigin = window.location.origin;
   
-  // Build allowed origins list
-  const allowedOrigins = [...ALLOWED_ORIGINS];
+  // Use allowed origins from security config
+  const allowedOrigins = [...SECURITY_CONFIG.ALLOWED_ORIGINS];
   
   // Add expected origin if provided
   if (expectedOrigin && !allowedOrigins.includes(expectedOrigin)) {
     allowedOrigins.push(expectedOrigin);
-  }
-  
-  // Check for Lovable preview URLs (pattern: *.lovable.app)
-  if (currentOrigin.endsWith('.lovable.app')) {
-    allowedOrigins.push(currentOrigin);
   }
   
   const isValid = allowedOrigins.includes(currentOrigin);
@@ -36,7 +25,7 @@ export const validateRequestOrigin = (expectedOrigin?: string): boolean => {
       details: {
         currentOrigin,
         allowedOrigins: allowedOrigins.filter(origin => !origin.includes('localhost')), // Don't log localhost in production
-        userAgent: navigator.userAgent,
+        userAgent: navigator.userAgent.substring(0, 100),
         timestamp: new Date().toISOString()
       }
     });
@@ -73,6 +62,33 @@ export const validateRequestRate = (identifier: string, maxRequests: number = 10
       }
     });
     return false;
+  }
+  
+  return true;
+};
+
+// Enhanced request validation with CSRF protection
+export const validateSecureRequest = (csrfToken?: string): boolean => {
+  // Validate origin
+  if (!validateRequestOrigin()) {
+    return false;
+  }
+  
+  // Validate CSRF token for state-changing operations
+  if (csrfToken) {
+    const storedToken = sessionStorage.getItem('csrf_token');
+    if (!storedToken || storedToken !== csrfToken) {
+      logSecurityEvent({
+        event_type: 'CSRF_TOKEN_MISMATCH',
+        severity: 'high',
+        details: {
+          hasToken: !!csrfToken,
+          hasStoredToken: !!storedToken,
+          timestamp: new Date().toISOString()
+        }
+      });
+      return false;
+    }
   }
   
   return true;

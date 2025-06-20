@@ -36,7 +36,32 @@ export const SECURITY_CONFIG = {
     /(alert|confirm|prompt)\s*\(/gi,
   ],
   
-  // Content Security Policy
+  // Environment-aware allowed origins
+  ALLOWED_ORIGINS: (() => {
+    const origins = [
+      'https://gklfrynehiqrwbddvaaa.supabase.co',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://localhost:3000'
+    ];
+    
+    // Add current origin if in browser
+    if (typeof window !== 'undefined') {
+      const currentOrigin = window.location.origin;
+      if (!origins.includes(currentOrigin)) {
+        origins.push(currentOrigin);
+      }
+      
+      // Add Lovable preview URLs
+      if (currentOrigin.endsWith('.lovable.app')) {
+        origins.push(currentOrigin);
+      }
+    }
+    
+    return origins;
+  })(),
+  
+  // Content Security Policy - Updated for better security
   CSP_DIRECTIVES: {
     'default-src': ["'self'"],
     'script-src': ["'self'", "'unsafe-inline'", "https://maps.googleapis.com"],
@@ -47,11 +72,12 @@ export const SECURITY_CONFIG = {
     'frame-src': ["'none'"],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
-    'form-action': ["'self'"]
+    'form-action': ["'self'"],
+    'upgrade-insecure-requests': []
   }
 } as const;
 
-// Enhanced input sanitization utility - updated to accept any number for maxLength
+// Enhanced input sanitization utility
 export const sanitizeInput = (input: string, maxLength: number = SECURITY_CONFIG.MAX_INPUT_LENGTH): string => {
   if (!input || typeof input !== 'string') return '';
   
@@ -86,9 +112,21 @@ export const detectXSSAttempt = (input: string): boolean => {
   return SECURITY_CONFIG.XSS_PATTERNS.some(pattern => pattern.test(input));
 };
 
-// Generate Content Security Policy header
+// Generate Content Security Policy header with environment awareness
 export const generateCSPHeader = (): string => {
   return Object.entries(SECURITY_CONFIG.CSP_DIRECTIVES)
     .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
     .join('; ');
+};
+
+// Environment-aware CORS headers
+export const getCORSHeaders = (): Record<string, string> => {
+  const allowedOrigins = SECURITY_CONFIG.ALLOWED_ORIGINS.join(', ');
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigins,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-csrf-token',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
+  };
 };
