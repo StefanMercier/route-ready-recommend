@@ -52,7 +52,7 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
 }) => {
   const [departureError, setDepartureError] = React.useState<string>('');
   const [destinationError, setDestinationError] = React.useState<string>('');
-  const { detectSuspiciousActivity, validateRequestOrigin } = useSecurityMonitoring();
+  const { detectSuspiciousActivity } = useSecurityMonitoring();
   const { token: csrfToken } = useCSRF();
 
   const handleDepartureChange = (value: string) => {
@@ -79,12 +79,6 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate request origin
-    if (!validateRequestOrigin()) {
-      console.warn('Invalid request origin detected');
-      return;
-    }
     
     const departureValidation = validateInput(departure);
     const destinationValidation = validateInput(destination);
