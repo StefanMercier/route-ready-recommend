@@ -58,7 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    // Use production URL if available, otherwise fall back to current origin
+    const baseUrl = window.location.hostname.includes('lovable.app') 
+      ? window.location.origin 
+      : 'https://gklfrynehiqrwbddvaaa.supabase.co';
+    
+    const redirectUrl = `${baseUrl}/`;
     
     const { error } = await supabase.auth.signUp({
       email,
