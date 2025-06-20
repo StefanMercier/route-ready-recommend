@@ -170,7 +170,7 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
             disabled={loading || !!departureError || !!destinationError || !departure || !destination}
             className="w-full"
           >
-            {loading ? 'Calculating...' : 'Calculate Travel Time (Demo)'}
+            {loading ? 'Calculating...' : 'Calculate Travel Time'}
           </Button>
         </form>
       </CardContent>
