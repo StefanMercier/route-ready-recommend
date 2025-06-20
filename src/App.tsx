@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CSRFProvider } from "@/components/CSRFProtection";
 import SecurityHeaders from "@/components/SecurityHeaders";
+import AuthDebugger from "@/components/AuthDebugger";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import TravelPlanner from "./pages/TravelPlanner";
@@ -15,7 +16,15 @@ import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -55,6 +64,7 @@ const App = () => (
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <AuthDebugger />
           </BrowserRouter>
         </TooltipProvider>
       </CSRFProvider>
