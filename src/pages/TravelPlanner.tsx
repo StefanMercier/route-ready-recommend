@@ -9,6 +9,7 @@ import RouteMap from '@/components/RouteMap';
 import UserMenu from '@/components/UserMenu';
 import PaymentGate from '@/components/PaymentGate';
 import { usePaymentStatus } from '@/hooks/usePaymentStatus';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -26,6 +27,13 @@ const TravelPlanner = () => {
   const [result, setResult] = useState<TravelCalculation | null>(null);
   const [useRealDistance, setUseRealDistance] = useState(false);
   const { hasPaid, loading: paymentLoading } = usePaymentStatus();
+  const { 
+    usageCount, 
+    remainingUses, 
+    hasReachedLimit, 
+    loading: usageLoading, 
+    incrementUsage 
+  } = useUsageTracking();
 
   const calculateTravelTime = (distance: number): TravelCalculation => {
     // Calculate driving time (miles / 60 mph average)
@@ -53,7 +61,20 @@ const TravelPlanner = () => {
     };
   };
 
-  const handleDistanceCalculated = (distance: number, duration: number) => {
+  const handleDistanceCalculated = async (distance: number, duration: number) => {
+    // For paid users, don't increment usage
+    if (!hasPaid) {
+      const success = await incrementUsage();
+      if (!success) {
+        toast({
+          title: "Error",
+          description: "Failed to update usage count. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     const calculation = calculateTravelTime(distance);
     setResult(calculation);
     setUseRealDistance(true);
@@ -83,18 +104,46 @@ const TravelPlanner = () => {
       return;
     }
 
+    // Check usage limit for non-paid users
+    if (!hasPaid && hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your free usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
+      // For non-paid users, increment usage on demo calculation
+      if (!hasPaid) {
+        const success = await incrementUsage();
+        if (!success) {
+          toast({
+            title: "Error",
+            description: "Failed to update usage count. Please try again.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       // For demo purposes when Google Maps is not loaded
       const mockDistance = Math.floor(Math.random() * 800) + 100;
       const calculation = calculateTravelTime(mockDistance);
       setResult(calculation);
       setUseRealDistance(false);
       
+      const usageMessage = hasPaid 
+        ? "Load Google Maps for real data."
+        : `Remaining free calculations: ${remainingUses - 1}. Load Google Maps for real data.`;
+      
       toast({
         title: "Calculation Complete (Demo)",
-        description: `Estimated travel time: ${calculation.totalTravelTime.toFixed(1)} hours. Load Google Maps for real data.`,
+        description: `Estimated travel time: ${calculation.totalTravelTime.toFixed(1)} hours. ${usageMessage}`,
       });
     } catch (error) {
       toast({
@@ -107,7 +156,7 @@ const TravelPlanner = () => {
     }
   };
 
-  if (paymentLoading) {
+  if (paymentLoading || usageLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -119,13 +168,29 @@ const TravelPlanner = () => {
   }
 
   return (
-    <PaymentGate hasPaid={hasPaid}>
+    <PaymentGate 
+      hasPaid={hasPaid} 
+      hasReachedLimit={hasReachedLimit}
+      remainingUses={remainingUses}
+    >
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex justify-between items-center">
             <TravelBanner />
             <UserMenu />
           </div>
+
+          {/* Usage indicator for non-paid users */}
+          {!hasPaid && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <p className="text-blue-800">
+                <span className="font-medium">Free calculations remaining: {remainingUses}</span>
+                {remainingUses === 1 && (
+                  <span className="block text-sm mt-1">Upgrade to Premium for unlimited access!</span>
+                )}
+              </p>
+            </div>
+          )}
 
           <RouteInputForm
             departure={departure}

@@ -2,16 +2,23 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Check, X } from 'lucide-react';
+import { Crown, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
 interface PaymentGateProps {
   children: React.ReactNode;
   hasPaid: boolean;
+  hasReachedLimit: boolean;
+  remainingUses: number;
 }
 
-const PaymentGate: React.FC<PaymentGateProps> = ({ children, hasPaid }) => {
+const PaymentGate: React.FC<PaymentGateProps> = ({ 
+  children, 
+  hasPaid, 
+  hasReachedLimit, 
+  remainingUses 
+}) => {
   const handlePayment = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout');
@@ -32,7 +39,8 @@ const PaymentGate: React.FC<PaymentGateProps> = ({ children, hasPaid }) => {
     }
   };
 
-  if (hasPaid) {
+  // Allow access if user has paid OR hasn't reached the usage limit
+  if (hasPaid || !hasReachedLimit) {
     return <>{children}</>;
   }
 
@@ -42,18 +50,24 @@ const PaymentGate: React.FC<PaymentGateProps> = ({ children, hasPaid }) => {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Crown className="h-8 w-8 text-yellow-600" />
-            <span className="text-2xl font-bold text-gray-900">Premium Access Required</span>
+            <span className="text-2xl font-bold text-gray-900">Free Limit Reached</span>
           </div>
-          <CardTitle>Unlock Route Ready Premium</CardTitle>
+          <CardTitle>Upgrade to Route Ready Premium</CardTitle>
           <CardDescription>
-            Get full access to all travel planning features
+            You've used all 5 free route calculations. Upgrade for unlimited access!
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="text-center p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              Free calculations used: <span className="font-bold">5/5</span>
+            </p>
+          </div>
+
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Check className="h-5 w-5 text-green-600" />
-              <span>Advanced route calculation</span>
+              <span>Unlimited route calculations</span>
             </div>
             <div className="flex items-center gap-3">
               <Check className="h-5 w-5 text-green-600" />
@@ -65,7 +79,7 @@ const PaymentGate: React.FC<PaymentGateProps> = ({ children, hasPaid }) => {
             </div>
             <div className="flex items-center gap-3">
               <Check className="h-5 w-5 text-green-600" />
-              <span>Unlimited route planning</span>
+              <span>Advanced route optimization</span>
             </div>
           </div>
           

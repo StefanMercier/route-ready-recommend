@@ -65,6 +65,7 @@ export type Database = {
           has_paid: boolean
           id: string
           updated_at: string
+          usage_count: number
         }
         Insert: {
           created_at?: string
@@ -73,6 +74,7 @@ export type Database = {
           has_paid?: boolean
           id: string
           updated_at?: string
+          usage_count?: number
         }
         Update: {
           created_at?: string
@@ -81,6 +83,7 @@ export type Database = {
           has_paid?: boolean
           id?: string
           updated_at?: string
+          usage_count?: number
         }
         Relationships: []
       }
