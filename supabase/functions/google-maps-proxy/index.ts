@@ -70,6 +70,93 @@ serve(async (req) => {
       );
     }
 
+    const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    if (!apiKey) {
+      console.error("Google Maps API key not configured");
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable" }), 
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Handle POST requests with body
+    if (req.method === "POST") {
+      const body = await req.json();
+      console.log('Received request body:', body);
+      
+      const { service, origin, destination, mode = 'driving', units = 'imperial' } = body;
+
+      if (!service || !origin || !destination) {
+        return new Response(
+          JSON.stringify({ error: "Missing required parameters: service, origin, destination" }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+
+      // Validate allowed services
+      const allowedServices = ["directions", "geocoding", "places"];
+      if (!allowedServices.includes(service)) {
+        return new Response(
+          JSON.stringify({ error: "Service not allowed" }), 
+          { 
+            status: 403, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+
+      // Build Google Maps API URL
+      const googleUrl = new URL(`https://maps.googleapis.com/maps/api/${service}/json`);
+      
+      // Add parameters based on service type
+      if (service === 'directions') {
+        googleUrl.searchParams.set('origin', validateInput(origin, 200));
+        googleUrl.searchParams.set('destination', validateInput(destination, 200));
+        googleUrl.searchParams.set('mode', validateInput(mode, 20));
+        googleUrl.searchParams.set('units', validateInput(units, 20));
+      }
+      
+      googleUrl.searchParams.set('key', apiKey);
+
+      console.log('Calling Google Maps API:', googleUrl.toString().replace(apiKey, '[API_KEY]'));
+
+      const response = await fetch(googleUrl.toString(), {
+        method: 'GET',
+        headers: {
+          "User-Agent": "TripStrs-Proxy/1.0"
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`Google Maps API error: ${response.status}`);
+        return new Response(
+          JSON.stringify({ error: "External service error" }), 
+          { 
+            status: 502, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+
+      const data = await response.json();
+      console.log('Google Maps API response status:', data.status);
+      
+      return new Response(JSON.stringify(data), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300" // 5 minutes cache
+        }
+      });
+    }
+
+    // Handle GET requests (legacy support)
     const url = new URL(req.url);
     const service = validateInput(url.searchParams.get("service") || "");
     
@@ -90,18 +177,6 @@ serve(async (req) => {
         JSON.stringify({ error: "Service not allowed" }), 
         { 
           status: 403, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
-
-    const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
-    if (!apiKey) {
-      console.error("Google Maps API key not configured");
-      return new Response(
-        JSON.stringify({ error: "Service temporarily unavailable" }), 
-        { 
-          status: 503, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
