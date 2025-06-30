@@ -11,6 +11,8 @@ import { usePaymentStatus } from '@/hooks/usePaymentStatus';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Share } from 'lucide-react';
+import ShareResults from '@/components/ShareResults';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -39,6 +41,19 @@ const TravelPlanner = () => {
     loading: usageLoading, 
     incrementUsage 
   } = useUsageTracking();
+
+  const handleReset = () => {
+    setDeparture('');
+    setDestination('');
+    setResult(null);
+    setUseRealDistance(false);
+    setLoading(false);
+    
+    toast({
+      title: "Reset Complete",
+      description: "Ready for a new route calculation.",
+    });
+  };
 
   const calculateTravelTime = (distance: number): TravelCalculation => {
     // Calculate driving time (miles / 60 mph average)
@@ -242,10 +257,18 @@ const TravelPlanner = () => {
             onDepartureChange={setDeparture}
             onDestinationChange={setDestination}
             onCalculate={handleCalculate}
+            onReset={handleReset}
           />
 
           {result && (
-            <TravelResults result={result} />
+            <>
+              <TravelResults result={result} />
+              <ShareResults 
+                departure={departure}
+                destination={destination}
+                result={result}
+              />
+            </>
           )}
 
           {result && (

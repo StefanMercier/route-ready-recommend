@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -127,6 +126,9 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       return;
     }
 
+    // Clear previous route
+    directionsRendererRef.current.setDirections({ routes: [] } as any);
+    
     setLoading(true);
     setApiError(null);
 
@@ -164,6 +166,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           onDistanceCalculated(distanceInMiles, durationInHours);
         } else {
           console.error('Directions request failed:', status);
+          setApiError(`Failed to calculate route: ${status}`);
           // Fallback to proxy method
           calculateRouteViaProxy();
         }
@@ -171,6 +174,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
     } catch (error) {
       console.error('Error with Google Maps Directions:', error);
       setLoading(false);
+      setApiError('Failed to calculate route. Please try again.');
       // Fallback to proxy method
       calculateRouteViaProxy();
     }
@@ -219,6 +223,13 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       setLoading(false);
     }
   };
+
+  // Clear route when inputs change
+  useEffect(() => {
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setDirections({ routes: [] } as any);
+    }
+  }, [departure, destination]);
 
   useEffect(() => {
     if (departure && destination && isGoogleMapsLoaded && directionsServiceRef.current) {

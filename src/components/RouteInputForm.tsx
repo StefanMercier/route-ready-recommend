@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +16,7 @@ interface RouteInputFormProps {
   onDepartureChange: (value: string) => void;
   onDestinationChange: (value: string) => void;
   onCalculate: () => void;
+  onReset: () => void;
 }
 
 const validateInput = (input: string): { isValid: boolean; error?: string } => {
@@ -48,7 +48,8 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
   loading,
   onDepartureChange,
   onDestinationChange,
-  onCalculate
+  onCalculate,
+  onReset
 }) => {
   const [departureError, setDepartureError] = React.useState<string>('');
   const [destinationError, setDestinationError] = React.useState<string>('');
@@ -159,13 +160,25 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
             </div>
           </div>
           
-          <Button 
-            type="submit"
-            disabled={loading || !!departureError || !!destinationError || !departure || !destination}
-            className="w-full"
-          >
-            {loading ? 'Calculating...' : 'Calculate Travel Time'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              type="submit"
+              disabled={loading || !!departureError || !!destinationError || !departure || !destination}
+              className="flex-1"
+            >
+              {loading ? 'Calculating...' : 'Calculate Travel Time'}
+            </Button>
+            
+            <Button 
+              type="button"
+              variant="outline"
+              onClick={onReset}
+              disabled={loading}
+              className="px-6"
+            >
+              Reset
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
