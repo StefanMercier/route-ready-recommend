@@ -1,7 +1,7 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import { getGoogleMapsApiKey } from '@/utils/googleMapsKey';
 
 interface GoogleMapProps {
   departure: string;
@@ -18,9 +18,9 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const [loading, setLoading] = useState(false);
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
 
-  // Load Google Maps API
+  // Load Google Maps API with proper key
   useEffect(() => {
-    const loadGoogleMaps = () => {
+    const loadGoogleMaps = async () => {
       // Check if Google Maps is already loaded
       if (window.google && window.google.maps) {
         setIsGoogleMapsLoaded(true);
@@ -47,23 +47,38 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         return;
       }
 
-      // Load the script
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_API_KEY || ''}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      
-      script.onload = () => {
-        console.log('Google Maps API loaded successfully');
-        setIsGoogleMapsLoaded(true);
-      };
-      
-      script.onerror = () => {
-        console.error('Failed to load Google Maps API');
-        setApiError('Failed to load Google Maps API. Please check your API key and network connection.');
-      };
-      
-      document.head.appendChild(script);
+      try {
+        // Get API key from Supabase
+        const apiKey = await getGoogleMapsApiKey();
+        
+        if (!apiKey) {
+          setApiError('Google Maps API key not available');
+          return;
+        }
+
+        console.log('Loading Google Maps with API key...');
+        
+        // Load the script with the API key
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+        script.async = true;
+        script.defer = true;
+        
+        script.onload = () => {
+          console.log('Google Maps API loaded successfully');
+          setIsGoogleMapsLoaded(true);
+        };
+        
+        script.onerror = () => {
+          console.error('Failed to load Google Maps API');
+          setApiError('Failed to load Google Maps API. Please check your API key and network connection.');
+        };
+        
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('Error loading Google Maps:', error);
+        setApiError('Failed to initialize Google Maps');
+      }
     };
 
     loadGoogleMaps();

@@ -66,14 +66,14 @@ export const SECURITY_CONFIG = {
     return origins;
   })(),
   
-  // Content Security Policy - Stricter
+  // Content Security Policy - Updated for Google Maps
   CSP_DIRECTIVES: {
     'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-inline'", "https://maps.googleapis.com"],
+    'script-src': ["'self'", "'unsafe-inline'", "https://maps.googleapis.com", "https://maps.gstatic.com"],
     'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
     'font-src': ["'self'", "https://fonts.gstatic.com"],
-    'img-src': ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com"],
-    'connect-src': ["'self'", "https://gklfrynehiqrwbddvaaa.supabase.co"],
+    'img-src': ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://*.googleapis.com", "https://*.gstatic.com"],
+    'connect-src': ["'self'", "https://gklfrynehiqrwbddvaaa.supabase.co", "https://maps.googleapis.com", "https://*.googleapis.com"],
     'frame-src': ["'none'"],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
