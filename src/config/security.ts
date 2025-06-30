@@ -73,7 +73,7 @@ export const SECURITY_CONFIG = {
     'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
     'font-src': ["'self'", "https://fonts.gstatic.com"],
     'img-src': ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://*.googleapis.com", "https://*.gstatic.com"],
-    'connect-src': ["'self'", "https://gklfrynehiqrwbddvaaa.supabase.co", "https://maps.googleapis.com", "https://*.googleapis.com"],
+    'connect-src': ["'self'", "https://gklfrynehiqrwbddvaaa.supabase.co", "https://maps.googleapis.com", "https://*.googleapis.com", "https://maps.gstatic.com", "https://*.gstatic.com"],
     'frame-src': ["'none'"],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
