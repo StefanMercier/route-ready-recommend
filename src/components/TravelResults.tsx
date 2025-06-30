@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Route, AlertTriangle, CheckCircle, DollarSign } from 'lucide-react';
+import { Route, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface TravelCalculation {
   totalDistance: number;
@@ -22,14 +23,6 @@ const TravelResults: React.FC<TravelResultsProps> = ({ result }) => {
     const m = Math.round((hours - h) * 60);
     return `${h}h ${m}m`;
   };
-
-  const calculateCostPerPassenger = (totalMiles: number): number => {
-    const costPerMile = 8;
-    const averageCapacity = 40;
-    return (totalMiles * costPerMile) / averageCapacity;
-  };
-
-  const costPerPassenger = calculateCostPerPassenger(result.totalDistance);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -72,13 +65,6 @@ const TravelResults: React.FC<TravelResultsProps> = ({ result }) => {
             <div className="flex justify-between border-t pt-2">
               <span className="font-semibold">Total Travel Time:</span>
               <span className="font-bold text-lg">{formatTime(result.totalTravelTime)}</span>
-            </div>
-            <div className="flex justify-between items-center bg-yellow-50 p-2 rounded border-t mt-2">
-              <span className="font-semibold flex items-center gap-1">
-                <DollarSign className="h-4 w-4" />
-                Estimated Cost Per Passenger:
-              </span>
-              <span className="font-bold text-lg text-yellow-700">${costPerPassenger.toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
