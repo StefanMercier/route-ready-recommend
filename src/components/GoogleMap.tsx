@@ -1,8 +1,10 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
-import { getGoogleMapsApiKey } from '@/utils/googleMapsKey';
+import { useGoogleMapsLoader } from '@/hooks/useGoogleMapsLoader';
+import { useRouteCalculation } from '@/hooks/useRouteCalculation';
+import { useGoogleMap } from '@/hooks/useGoogleMap';
 
 interface GoogleMapProps {
   departure: string;
@@ -11,98 +13,15 @@ interface GoogleMapProps {
 }
 
 const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanceCalculated }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
+  const { isGoogleMapsLoaded, apiError, setApiError } = useGoogleMapsLoader();
+  const { loading, calculateRoute, directionsServiceRef, directionsRendererRef, clearRoute } = useRouteCalculation();
+  const { mapRef, mapInstanceRef } = useGoogleMap(isGoogleMapsLoaded, setApiError);
 
-  // Load Google Maps API with proper key
+  // Initialize directions service and renderer when map is ready
   useEffect(() => {
-    const loadGoogleMaps = async () => {
-      // Check if Google Maps is already loaded
-      if (window.google && window.google.maps && window.google.maps.MapTypeId) {
-        setIsGoogleMapsLoaded(true);
-        return;
-      }
-
-      // Check if script is already being loaded
-      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-        // Script is loading, wait for it
-        const checkInterval = setInterval(() => {
-          if (window.google && window.google.maps && window.google.maps.MapTypeId) {
-            setIsGoogleMapsLoaded(true);
-            clearInterval(checkInterval);
-          }
-        }, 100);
-        
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!window.google || !window.google.maps || !window.google.maps.MapTypeId) {
-            setApiError('Google Maps failed to load completely');
-          }
-        }, 10000);
-        return;
-      }
-
-      try {
-        // Get API key from Supabase
-        const apiKey = await getGoogleMapsApiKey();
-        
-        if (!apiKey) {
-          setApiError('Google Maps API key not available');
-          return;
-        }
-
-        console.log('Loading Google Maps with API key...');
-        
-        // Load the script with the API key
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps`;
-        script.async = true;
-        script.defer = true;
-        
-        // Create callback function
-        (window as any).initGoogleMaps = () => {
-          console.log('Google Maps API loaded successfully');
-          setIsGoogleMapsLoaded(true);
-          // Clean up the global callback
-          delete (window as any).initGoogleMaps;
-        };
-        
-        script.onerror = () => {
-          console.error('Failed to load Google Maps API');
-          setApiError('Failed to load Google Maps API. Please check your API key and network connection.');
-          delete (window as any).initGoogleMaps;
-        };
-        
-        document.head.appendChild(script);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setApiError('Failed to initialize Google Maps');
-      }
-    };
-
-    loadGoogleMaps();
-  }, []);
-
-  // Initialize map when Google Maps API is loaded
-  useEffect(() => {
-    if (!isGoogleMapsLoaded || !mapRef.current || !window.google?.maps?.MapTypeId) return;
+    if (!isGoogleMapsLoaded || !mapInstanceRef.current || !window.google?.maps?.MapTypeId) return;
 
     try {
-      console.log('Initializing Google Map...');
-      
-      // Initialize map
-      mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-        zoom: 4,
-        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
-        mapTypeId: google.maps.MapTypeId.ROADMAP,
-      });
-
       // Initialize directions service and renderer
       directionsServiceRef.current = new google.maps.DirectionsService();
       directionsRendererRef.current = new google.maps.DirectionsRenderer({
@@ -114,148 +33,29 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       });
       
       directionsRendererRef.current.setMap(mapInstanceRef.current);
-      console.log('Google Map initialized successfully');
+      console.log('Directions service initialized successfully');
     } catch (error) {
-      console.error('Error initializing Google Map:', error);
-      setApiError('Failed to initialize map');
+      console.error('Error initializing directions service:', error);
+      setApiError('Failed to initialize directions service');
     }
   }, [isGoogleMapsLoaded]);
 
-  const calculateAndDisplayRoute = async () => {
-    // Validate inputs before attempting calculation
-    if (!departure || !destination || !departure.trim() || !destination.trim()) {
-      console.log('Missing or empty departure/destination, skipping route calculation');
-      return;
-    }
-
-    if (!directionsServiceRef.current || !directionsRendererRef.current) {
-      console.log('Directions service not ready');
-      return;
-    }
-
-    // Clear previous route
-    directionsRendererRef.current.setDirections({ routes: [] } as any);
-    
-    setLoading(true);
-    setApiError(null);
-
-    try {
-      console.log('Calculating route with Google Maps Directions API...');
-      
-      const request = {
-        origin: departure.trim(),
-        destination: destination.trim(),
-        travelMode: google.maps.TravelMode.DRIVING,
-      };
-
-      directionsServiceRef.current.route(request, (result, status) => {
-        setLoading(false);
-        
-        if (status === 'OK' && result) {
-          console.log('Route calculated successfully with Google Maps API');
-          
-          // Display the route on the map
-          directionsRendererRef.current!.setDirections(result);
-          
-          // Calculate distance and duration
-          const route = result.routes[0];
-          const leg = route.legs[0];
-          
-          const distanceInMiles = leg.distance!.value * 0.000621371;
-          const durationInHours = leg.duration!.value / 3600;
-          
-          console.log('Route details:', {
-            distance: distanceInMiles,
-            duration: durationInHours,
-            status: status
-          });
-          
-          onDistanceCalculated(distanceInMiles, durationInHours);
-        } else {
-          console.error('Directions request failed:', status);
-          setApiError(`Failed to calculate route: ${status}`);
-          // Fallback to proxy method
-          calculateRouteViaProxy();
-        }
-      });
-    } catch (error) {
-      console.error('Error with Google Maps Directions:', error);
-      setLoading(false);
-      setApiError('Failed to calculate route. Please try again.');
-      // Fallback to proxy method
-      calculateRouteViaProxy();
-    }
-  };
-
-  const calculateRouteViaProxy = async () => {
-    // Validate inputs before proxy calculation
-    if (!departure || !destination || !departure.trim() || !destination.trim()) {
-      console.log('Missing or empty departure/destination, skipping proxy calculation');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log('Calculating route via proxy fallback...');
-      
-      const proxyUrl = `https://gklfrynehiqrwbddvaaa.supabase.co/functions/v1/google-maps-proxy?service=directions&origin=${encodeURIComponent(departure.trim())}&destination=${encodeURIComponent(destination.trim())}&mode=driving`;
-      
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrbGZyeW5laGlxcndiZGR2YWFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMDcyMjUsImV4cCI6MjA2MzY4MzIyNX0.uXqbDiPCU99bmemtBIrxXqm3jm53gHnhv3gvCJXrBaU`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrbGZyeW5laGlxcndiZGR2YWFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMDcyMjUsImV4cCI6MjA2MzY4MzIyNX0.uXqbDiPCU99bmemtBIrxXqm3jm53gHnhv3gvCJXrBaU'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs[0];
-        
-        const distanceInMiles = leg.distance.value * 0.000621371;
-        const durationInHours = leg.duration.value / 3600;
-        
-        console.log('Route calculated via proxy:', {
-          distance: distanceInMiles,
-          duration: durationInHours
-        });
-        
-        onDistanceCalculated(distanceInMiles, durationInHours);
-      } else {
-        setApiError(data.error_message || 'Failed to calculate route');
-      }
-    } catch (error) {
-      console.error('Error calculating route via proxy:', error);
-      setApiError('Network error. Please check your connection and try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Clear route when inputs change or are cleared
   useEffect(() => {
-    if (directionsRendererRef.current) {
-      directionsRendererRef.current.setDirections({ routes: [] } as any);
-    }
+    clearRoute();
     
     // Clear any existing error when inputs change
     if (apiError) {
       setApiError(null);
     }
-  }, [departure, destination]);
+  }, [departure, destination, clearRoute, apiError, setApiError]);
 
   // Only calculate route when both inputs are valid and not empty
   useEffect(() => {
     if (departure && destination && departure.trim() && destination.trim() && isGoogleMapsLoaded && directionsServiceRef.current) {
-      calculateAndDisplayRoute();
+      calculateRoute(departure, destination, onDistanceCalculated);
     }
-  }, [departure, destination, isGoogleMapsLoaded]);
+  }, [departure, destination, isGoogleMapsLoaded, calculateRoute, onDistanceCalculated]);
 
   if (!isGoogleMapsLoaded) {
     return (
