@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -121,8 +122,14 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   }, [isGoogleMapsLoaded]);
 
   const calculateAndDisplayRoute = async () => {
-    if (!departure || !destination || !directionsServiceRef.current || !directionsRendererRef.current) {
-      console.log('Missing required elements for route calculation');
+    // Validate inputs before attempting calculation
+    if (!departure || !destination || !departure.trim() || !destination.trim()) {
+      console.log('Missing or empty departure/destination, skipping route calculation');
+      return;
+    }
+
+    if (!directionsServiceRef.current || !directionsRendererRef.current) {
+      console.log('Directions service not ready');
       return;
     }
 
@@ -136,8 +143,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       console.log('Calculating route with Google Maps Directions API...');
       
       const request = {
-        origin: departure,
-        destination: destination,
+        origin: departure.trim(),
+        destination: destination.trim(),
         travelMode: google.maps.TravelMode.DRIVING,
       };
 
@@ -181,10 +188,17 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   };
 
   const calculateRouteViaProxy = async () => {
+    // Validate inputs before proxy calculation
+    if (!departure || !destination || !departure.trim() || !destination.trim()) {
+      console.log('Missing or empty departure/destination, skipping proxy calculation');
+      setLoading(false);
+      return;
+    }
+
     try {
       console.log('Calculating route via proxy fallback...');
       
-      const proxyUrl = `https://gklfrynehiqrwbddvaaa.supabase.co/functions/v1/google-maps-proxy?service=directions&origin=${encodeURIComponent(departure)}&destination=${encodeURIComponent(destination)}&mode=driving`;
+      const proxyUrl = `https://gklfrynehiqrwbddvaaa.supabase.co/functions/v1/google-maps-proxy?service=directions&origin=${encodeURIComponent(departure.trim())}&destination=${encodeURIComponent(destination.trim())}&mode=driving`;
       
       const response = await fetch(proxyUrl, {
         method: 'GET',
@@ -224,15 +238,21 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
     }
   };
 
-  // Clear route when inputs change
+  // Clear route when inputs change or are cleared
   useEffect(() => {
     if (directionsRendererRef.current) {
       directionsRendererRef.current.setDirections({ routes: [] } as any);
     }
+    
+    // Clear any existing error when inputs change
+    if (apiError) {
+      setApiError(null);
+    }
   }, [departure, destination]);
 
+  // Only calculate route when both inputs are valid and not empty
   useEffect(() => {
-    if (departure && destination && isGoogleMapsLoaded && directionsServiceRef.current) {
+    if (departure && destination && departure.trim() && destination.trim() && isGoogleMapsLoaded && directionsServiceRef.current) {
       calculateAndDisplayRoute();
     }
   }, [departure, destination, isGoogleMapsLoaded]);
