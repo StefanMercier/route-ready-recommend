@@ -1,22 +1,33 @@
-
 import React, { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { validateZipCode } from '@/services/distanceService';
 import TravelBanner from '@/components/TravelBanner';
-import TravelPlannerContent from '@/components/TravelPlannerContent';
+import RouteInputForm from '@/components/RouteInputForm';
+import TravelResults from '@/components/TravelResults';
+import RouteMap from '@/components/RouteMap';
 import UserMenu from '@/components/UserMenu';
 import PaymentGate from '@/components/PaymentGate';
 import { usePaymentStatus } from '@/hooks/usePaymentStatus';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useTravelCalculation } from '@/hooks/useTravelCalculation';
-import { useAnonymousUsage } from '@/hooks/useAnonymousUsage';
+
+interface TravelCalculation {
+  totalDistance: number;
+  roundTripDistance: number;
+  drivingTime: number;
+  restStops: number;
+  totalTravelTime: number;
+  recommendation: 'motorcoach' | 'flight';
+}
 
 const TravelPlanner = () => {
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<TravelCalculation | null>(null);
+  const [useRealDistance, setUseRealDistance] = useState(false);
+  const [anonymousUsageCount, setAnonymousUsageCount] = useState(0);
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -28,21 +39,32 @@ const TravelPlanner = () => {
     loading: usageLoading, 
     incrementUsage 
   } = useUsageTracking();
-  
-  const {
-    result,
-    setResult,
-    useRealDistance,
-    setUseRealDistance,
-    calculateTravelTime
-  } = useTravelCalculation();
-  
-  const {
-    anonymousUsageCount,
-    incrementAnonymousUsage,
-    getRemainingAnonymousUses,
-    hasReachedAnonymousLimit
-  } = useAnonymousUsage();
+
+  const calculateTravelTime = (distance: number): TravelCalculation => {
+    // Calculate driving time (miles / 60 mph average)
+    const drivingTime = distance / 60;
+    
+    // Calculate rest stops (every 3 hours, rounded up)
+    const restStops = Math.ceil(drivingTime / 3);
+    
+    // Add 30 minutes per rest stop
+    const restTime = restStops * 0.5;
+    
+    // Total travel time
+    const totalTravelTime = drivingTime + restTime;
+    
+    // Recommendation based on 10-hour DOT limit
+    const recommendation = totalTravelTime >= 9.5 ? 'flight' : 'motorcoach';
+    
+    return {
+      totalDistance: distance,
+      roundTripDistance: distance * 2,
+      drivingTime,
+      restStops,
+      totalTravelTime,
+      recommendation
+    };
+  };
 
   const handleDistanceCalculated = async (distance: number, duration: number) => {
     // Handle usage increment for authenticated users
@@ -88,7 +110,7 @@ const TravelPlanner = () => {
     }
 
     // Check if user needs to authenticate (6th calculation for anonymous users)
-    if (!user && hasReachedAnonymousLimit()) {
+    if (!user && anonymousUsageCount >= 5) {
       toast({
         title: "Sign In Required",
         description: "Please create an account to continue using the travel planner.",
@@ -127,7 +149,7 @@ const TravelPlanner = () => {
 
       // Increment anonymous usage count
       if (!user) {
-        incrementAnonymousUsage();
+        setAnonymousUsageCount(prev => prev + 1);
       }
 
       // For demo purposes when Google Maps is not loaded
@@ -138,7 +160,7 @@ const TravelPlanner = () => {
       
       let usageMessage = "Load Google Maps for real data.";
       if (!user) {
-        const remaining = getRemainingAnonymousUses() - 1;
+        const remaining = 5 - anonymousUsageCount;
         usageMessage = `${remaining} free calculations remaining. Load Google Maps for real data.`;
       } else if (!hasPaid) {
         usageMessage = `Remaining free calculations: ${remainingUses - 1}. Load Google Maps for real data.`;
@@ -188,22 +210,54 @@ const TravelPlanner = () => {
       <TravelBanner />
       <UserMenu />
       
-      <TravelPlannerContent
-        departure={departure}
-        destination={destination}
-        loading={loading}
-        result={result}
-        useRealDistance={useRealDistance}
-        user={user}
-        hasPaid={hasPaid}
-        anonymousUsageCount={anonymousUsageCount}
-        remainingUses={remainingUses}
-        hasReachedLimit={hasReachedLimit}
-        onDepartureChange={setDeparture}
-        onDestinationChange={setDestination}
-        onCalculate={handleCalculate}
-        onDistanceCalculated={handleDistanceCalculated}
-      />
+      <div className="p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Usage indicator */}
+          {!user && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <p className="text-blue-800">
+                <span className="font-medium">Free calculations remaining: {5 - anonymousUsageCount}</span>
+                {anonymousUsageCount >= 4 && (
+                  <span className="block text-sm mt-1">Create an account to continue after this calculation!</span>
+                )}
+              </p>
+            </div>
+          )}
+          
+          {user && !hasPaid && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <p className="text-blue-800">
+                <span className="font-medium">Free calculations remaining: {remainingUses}</span>
+                {remainingUses === 1 && (
+                  <span className="block text-sm mt-1">Upgrade to Premium for unlimited access!</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          <RouteInputForm
+            departure={departure}
+            destination={destination}
+            loading={loading}
+            onDepartureChange={setDeparture}
+            onDestinationChange={setDestination}
+            onCalculate={handleCalculate}
+          />
+
+          {result && (
+            <TravelResults result={result} />
+          )}
+
+          {result && (
+            <RouteMap
+              departure={departure}
+              destination={destination}
+              useRealDistance={useRealDistance}
+              onDistanceCalculated={handleDistanceCalculated}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };
