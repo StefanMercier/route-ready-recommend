@@ -20,71 +20,99 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
 
   // Load Google Maps API
   useEffect(() => {
-    const loadGoogleMaps = async () => {
+    const loadGoogleMaps = () => {
+      // Check if Google Maps is already loaded
       if (window.google && window.google.maps) {
         setIsGoogleMapsLoaded(true);
         return;
       }
 
-      try {
-        // Get API key from our proxy endpoint
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${await getApiKey()}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => setIsGoogleMapsLoaded(true);
-        script.onerror = () => setApiError('Failed to load Google Maps');
-        document.head.appendChild(script);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setApiError('Failed to load Google Maps API');
+      // Check if script is already being loaded
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        // Script is loading, wait for it
+        const checkInterval = setInterval(() => {
+          if (window.google && window.google.maps) {
+            setIsGoogleMapsLoaded(true);
+            clearInterval(checkInterval);
+          }
+        }, 100);
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          if (!window.google || !window.google.maps) {
+            setApiError('Google Maps failed to load');
+          }
+        }, 10000);
+        return;
       }
+
+      // Load the script
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_API_KEY || ''}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        console.log('Google Maps API loaded successfully');
+        setIsGoogleMapsLoaded(true);
+      };
+      
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+        setApiError('Failed to load Google Maps API. Please check your API key and network connection.');
+      };
+      
+      document.head.appendChild(script);
     };
 
     loadGoogleMaps();
   }, []);
 
-  const getApiKey = async () => {
-    // For security, we'll use our proxy to get directions
-    // But for map display, we need to load the Maps API directly
-    // This is a simplified approach - in production, you'd want to secure this differently
-    return 'YOUR_GOOGLE_MAPS_API_KEY'; // This would come from your environment
-  };
-
   // Initialize map when Google Maps API is loaded
   useEffect(() => {
     if (!isGoogleMapsLoaded || !mapRef.current) return;
 
-    // Initialize map
-    mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-      zoom: 4,
-      center: { lat: 39.8283, lng: -98.5795 }, // Center of US
-      mapTypeId: google.maps.MapTypeId.ROADMAP,
-    });
+    try {
+      console.log('Initializing Google Map...');
+      
+      // Initialize map
+      mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+        zoom: 4,
+        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+      });
 
-    // Initialize directions service and renderer
-    directionsServiceRef.current = new google.maps.DirectionsService();
-    directionsRendererRef.current = new google.maps.DirectionsRenderer({
-      suppressMarkers: false,
-      polylineOptions: {
-        strokeColor: '#4285f4',
-        strokeWeight: 4,
-      },
-    });
-    
-    directionsRendererRef.current.setMap(mapInstanceRef.current);
+      // Initialize directions service and renderer
+      directionsServiceRef.current = new google.maps.DirectionsService();
+      directionsRendererRef.current = new google.maps.DirectionsRenderer({
+        suppressMarkers: false,
+        polylineOptions: {
+          strokeColor: '#4285f4',
+          strokeWeight: 4,
+        },
+      });
+      
+      directionsRendererRef.current.setMap(mapInstanceRef.current);
+      console.log('Google Map initialized successfully');
+    } catch (error) {
+      console.error('Error initializing Google Map:', error);
+      setApiError('Failed to initialize map');
+    }
   }, [isGoogleMapsLoaded]);
 
   const calculateAndDisplayRoute = async () => {
-    if (!departure || !destination || !directionsServiceRef.current || !directionsRendererRef.current) return;
+    if (!departure || !destination || !directionsServiceRef.current || !directionsRendererRef.current) {
+      console.log('Missing required elements for route calculation');
+      return;
+    }
 
     setLoading(true);
     setApiError(null);
 
     try {
-      console.log('Calculating route with Google Maps...');
+      console.log('Calculating route with Google Maps Directions API...');
       
-      // Use Google Maps Directions Service directly for route display
       const request = {
         origin: departure,
         destination: destination,
@@ -92,7 +120,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       };
 
       directionsServiceRef.current.route(request, (result, status) => {
+        setLoading(false);
+        
         if (status === 'OK' && result) {
+          console.log('Route calculated successfully with Google Maps API');
+          
           // Display the route on the map
           directionsRendererRef.current!.setDirections(result);
           
@@ -103,30 +135,30 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           const distanceInMiles = leg.distance!.value * 0.000621371;
           const durationInHours = leg.duration!.value / 3600;
           
-          console.log('Route calculated successfully:', {
+          console.log('Route details:', {
             distance: distanceInMiles,
-            duration: durationInHours
+            duration: durationInHours,
+            status: status
           });
           
           onDistanceCalculated(distanceInMiles, durationInHours);
         } else {
-          console.error('Directions request failed due to ' + status);
-          // Fallback to our proxy method
+          console.error('Directions request failed:', status);
+          // Fallback to proxy method
           calculateRouteViaProxy();
         }
       });
     } catch (error) {
       console.error('Error with Google Maps Directions:', error);
-      // Fallback to our proxy method
-      calculateRouteViaProxy();
-    } finally {
       setLoading(false);
+      // Fallback to proxy method
+      calculateRouteViaProxy();
     }
   };
 
   const calculateRouteViaProxy = async () => {
     try {
-      console.log('Calculating route via proxy...');
+      console.log('Calculating route via proxy fallback...');
       
       const proxyUrl = `https://gklfrynehiqrwbddvaaa.supabase.co/functions/v1/google-maps-proxy?service=directions&origin=${encodeURIComponent(departure)}&destination=${encodeURIComponent(destination)}&mode=driving`;
       
@@ -163,11 +195,13 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
     } catch (error) {
       console.error('Error calculating route via proxy:', error);
       setApiError('Network error. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (departure && destination && isGoogleMapsLoaded) {
+    if (departure && destination && isGoogleMapsLoaded && directionsServiceRef.current) {
       calculateAndDisplayRoute();
     }
   }, [departure, destination, isGoogleMapsLoaded]);
