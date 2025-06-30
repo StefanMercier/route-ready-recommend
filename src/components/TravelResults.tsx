@@ -24,6 +24,9 @@ const TravelResults: React.FC<TravelResultsProps> = ({ result }) => {
     return `${h}h ${m}m`;
   };
 
+  // Calculate round trip time (double the one-way time plus additional rest stops if needed)
+  const roundTripTime = result.totalTravelTime * 2;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
@@ -48,6 +51,21 @@ const TravelResults: React.FC<TravelResultsProps> = ({ result }) => {
               <div className="text-sm text-gray-600">Round Trip Miles</div>
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-3 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">
+                {formatTime(result.totalTravelTime)}
+              </div>
+              <div className="text-sm text-gray-600">One-way Time</div>
+            </div>
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {formatTime(roundTripTime)}
+              </div>
+              <div className="text-sm text-gray-600">Round Trip Time</div>
+            </div>
+          </div>
           
           <div className="space-y-2">
             <div className="flex justify-between">
@@ -61,10 +79,6 @@ const TravelResults: React.FC<TravelResultsProps> = ({ result }) => {
             <div className="flex justify-between">
               <span>Rest Time:</span>
               <span className="font-semibold">{formatTime(result.restStops * 0.5)}</span>
-            </div>
-            <div className="flex justify-between border-t pt-2">
-              <span className="font-semibold">Total Travel Time:</span>
-              <span className="font-bold text-lg">{formatTime(result.totalTravelTime)}</span>
             </div>
           </div>
         </CardContent>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -171,10 +172,10 @@ const RouteInputForm: React.FC<RouteInputFormProps> = ({
             
             <Button 
               type="button"
-              variant="outline"
+              variant="default"
               onClick={onReset}
               disabled={loading}
-              className="px-6"
+              className="px-6 bg-blue-600 hover:bg-blue-700"
             >
               Reset
             </Button>

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100" style={{ background: 'linear-gradient(to bottom right, #FF664420, #FF6644)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
@@ -16,12 +16,12 @@ const Index = () => {
           </p>
           <div className="flex gap-4 justify-center">
             <Link to="/planner">
-              <Button size="lg" className="text-lg px-8 py-3" style={{ backgroundColor: '#FF6644', color: 'white' }}>
+              <Button size="lg" className="text-lg px-8 py-3 bg-blue-600 hover:bg-blue-700">
                 Get Started
               </Button>
             </Link>
             <Link to="/planner">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-3" style={{ borderColor: '#FF6644', color: '#FF6644' }}>
+              <Button size="lg" variant="outline" className="text-lg px-8 py-3 border-blue-600 text-blue-600 hover:bg-blue-50">
                 Start Planning Your Trip
               </Button>
             </Link>
@@ -30,8 +30,8 @@ const Index = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="bg-white rounded-lg p-6 shadow-lg text-center">
-            <div className="rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#FF664420' }}>
-              <Calculator className="h-8 w-8" style={{ color: '#FF6644' }} />
+            <div className="bg-blue-100 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Calculator className="h-8 w-8 text-blue-600" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Smart Calculations</h3>
             <p className="text-gray-600">
@@ -40,8 +40,8 @@ const Index = () => {
           </div>
 
           <div className="bg-white rounded-lg p-6 shadow-lg text-center">
-            <div className="rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#FF664420' }}>
-              <Route className="h-8 w-8" style={{ color: '#FF6644' }} />
+            <div className="bg-green-100 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Route className="h-8 w-8 text-green-600" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Route Planning</h3>
             <p className="text-gray-600">
@@ -50,8 +50,8 @@ const Index = () => {
           </div>
 
           <div className="bg-white rounded-lg p-6 shadow-lg text-center">
-            <div className="rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#FF664420' }}>
-              <Clock className="h-8 w-8" style={{ color: '#FF6644' }} />
+            <div className="bg-blue-100 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Clock className="h-8 w-8 text-blue-600" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Smart Recommendations</h3>
             <p className="text-gray-600">
@@ -64,19 +64,19 @@ const Index = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold" style={{ backgroundColor: '#FF6644' }}>1</div>
+              <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold">1</div>
               <p className="text-sm">Enter departure and destination locations</p>
             </div>
             <div className="text-center">
-              <div className="text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold" style={{ backgroundColor: '#FF6644' }}>2</div>
+              <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold">2</div>
               <p className="text-sm">Calculate distances and driving times</p>
             </div>
             <div className="text-center">
-              <div className="text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold" style={{ backgroundColor: '#FF6644' }}>3</div>
+              <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold">3</div>
               <p className="text-sm">Apply DOT regulations for rest stops</p>
             </div>
             <div className="text-center">
-              <div className="text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold" style={{ backgroundColor: '#FF6644' }}>4</div>
+              <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-2 text-sm font-bold">4</div>
               <p className="text-sm">Get motorcoach vs flight recommendation</p>
             </div>
           </div>
