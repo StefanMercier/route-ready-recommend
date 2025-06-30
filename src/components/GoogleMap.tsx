@@ -15,27 +15,23 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const calculateRouteWithDirectionsAPI = async () => {
+  // Use secure edge function for all route calculations and map display
+  const calculateRouteSecurely = async () => {
     if (!departure || !destination) return;
 
     setLoading(true);
     setApiError(null);
 
     try {
-      console.log('Calculating route with Google Directions API...');
+      console.log('Calculating route via secure edge function...');
       
-      // Use the Supabase edge function to call Google Maps Directions API
       const { data, error } = await supabase.functions.invoke('google-maps-proxy', {
         body: {
-          service: 'directions',
           origin: departure,
           destination: destination,
-          mode: 'driving',
-          units: 'imperial'
+          travelMode: 'DRIVING'
         }
       });
-
-      console.log('Edge function response:', data, error);
 
       if (error) {
         console.error('Edge function error:', error);
@@ -43,23 +39,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
         return;
       }
 
-      if (data && data.status === 'OK' && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs[0];
-        
-        // Extract distance in miles and duration in hours
-        const distanceInMiles = leg.distance.value * 0.000621371; // Convert meters to miles
-        const durationInHours = leg.duration.value / 3600; // Convert seconds to hours
-        
-        console.log('Route calculated successfully:', {
-          distance: distanceInMiles,
-          duration: durationInHours
-        });
-        
-        onDistanceCalculated(distanceInMiles, durationInHours);
+      if (data && data.status === 'OK') {
+        console.log('Route calculated successfully:', data);
+        onDistanceCalculated(data.distanceInMiles, data.durationInHours);
       } else {
-        console.error('Invalid response from Directions API:', data);
-        setApiError(data?.error_message || 'Failed to calculate route. Please check your locations.');
+        setApiError(data?.error || 'Failed to calculate route');
       }
     } catch (error) {
       console.error('Error calculating route:', error);
@@ -71,7 +55,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
 
   useEffect(() => {
     if (departure && destination) {
-      calculateRouteWithDirectionsAPI();
+      calculateRouteSecurely();
     }
   }, [departure, destination]);
 
@@ -82,6 +66,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             {apiError}
+            <br />
+            <strong>Note:</strong> All route calculations are processed securely through our backend service.
           </AlertDescription>
         </Alert>
       )}
@@ -89,22 +75,17 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       {loading && (
         <Alert>
           <AlertDescription>
-            Calculating route with Google Maps...
+            Calculating route securely...
           </AlertDescription>
         </Alert>
       )}
       
       <div className="w-full h-96 rounded-lg border bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-2">Google Maps Route Calculation</p>
+          <p className="text-gray-600 mb-2">Secure Route Calculation</p>
           <p className="text-sm text-gray-500">
-            Real-time distance and duration data from Google Maps
+            All map data and routing is processed through our secure backend
           </p>
-          {loading && (
-            <div className="mt-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            </div>
-          )}
         </div>
       </div>
     </div>
