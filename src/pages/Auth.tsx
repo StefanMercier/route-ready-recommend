@@ -21,7 +21,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
-  const { monitorFailedLoginAttempts, logSecurityEvent, validateAndSanitizeInput } = useSecurityMonitoring();
+  const { monitorFailedLoginAttempts, logSecurityEvent } = useSecurityMonitoring();
   const { token: csrfToken } = useCSRF();
   const failedLoginMonitor = monitorFailedLoginAttempts();
 
@@ -32,13 +32,32 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
-  const handleInputChange = (value: string, field: string, setter: (value: string) => void) => {
-    const { sanitized, isValid, errors } = validateAndSanitizeInput(value, field);
+  // Simple input validation without overly aggressive security checks for auth flow
+  const validateBasicInput = (value: string, fieldName: string) => {
+    if (!value || typeof value !== 'string') return '';
     
-    if (!isValid && errors.length > 0) {
-      console.warn(`Security validation failed for ${field}:`, errors);
+    // Basic sanitization - trim and limit length
+    let sanitized = value.trim();
+    
+    if (fieldName === 'email') {
+      // For email, just trim and enforce length limit
+      if (sanitized.length > SECURITY_CONFIG.MAX_EMAIL_LENGTH) {
+        sanitized = sanitized.substring(0, SECURITY_CONFIG.MAX_EMAIL_LENGTH);
+      }
+    } else if (fieldName === 'fullName') {
+      // For full name, basic sanitization
+      if (sanitized.length > SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH) {
+        sanitized = sanitized.substring(0, SECURITY_CONFIG.MAX_SHORT_INPUT_LENGTH);
+      }
+      // Remove obvious HTML tags but don't be overly aggressive
+      sanitized = sanitized.replace(/<[^>]*>/g, '');
     }
     
+    return sanitized;
+  };
+
+  const handleInputChange = (value: string, field: string, setter: (value: string) => void) => {
+    const sanitized = validateBasicInput(value, field);
     setter(sanitized);
   };
 
@@ -215,7 +234,7 @@ const Auth = () => {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <MapPin className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">Route Ready</span>
+            <span className="text-2xl font-bold text-gray-900">Aero Road</span>
           </div>
           <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
           <CardDescription>
