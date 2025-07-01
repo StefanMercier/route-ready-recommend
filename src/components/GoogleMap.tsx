@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { useGoogleMapsLoader } from '@/hooks/useGoogleMapsLoader';
@@ -16,6 +16,16 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
   const { isGoogleMapsLoaded, apiError, setApiError } = useGoogleMapsLoader();
   const { loading, calculateRoute, directionsServiceRef, directionsRendererRef, clearRoute } = useRouteCalculation();
   const { mapRef, mapInstanceRef } = useGoogleMap(isGoogleMapsLoaded, setApiError);
+  
+  // Track the last calculated route to prevent duplicate calculations
+  const lastRouteRef = useRef<string>('');
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  // Memoize the callback to prevent unnecessary re-renders
+  const stableOnDistanceCalculated = useCallback((distance: number, duration: number) => {
+    setIsCalculating(false);
+    onDistanceCalculated(distance, duration);
+  }, [onDistanceCalculated]);
 
   // Initialize directions service and renderer when map is ready
   useEffect(() => {
@@ -38,11 +48,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
       console.error('Error initializing directions service:', error);
       setApiError('Failed to initialize directions service');
     }
-  }, [isGoogleMapsLoaded]);
+  }, [isGoogleMapsLoaded, setApiError, directionsServiceRef, directionsRendererRef, mapInstanceRef]);
 
   // Clear route when inputs change or are cleared
   useEffect(() => {
     clearRoute();
+    setIsCalculating(false);
     
     // Clear any existing error when inputs change
     if (apiError) {
@@ -50,12 +61,27 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ departure, destination, onDistanc
     }
   }, [departure, destination, clearRoute, apiError, setApiError]);
 
-  // Only calculate route when both inputs are valid and not empty
+  // Calculate route with proper duplicate prevention
   useEffect(() => {
-    if (departure && destination && departure.trim() && destination.trim() && isGoogleMapsLoaded && directionsServiceRef.current) {
-      calculateRoute(departure, destination, onDistanceCalculated);
+    // Create a unique key for this route combination
+    const routeKey = `${departure?.trim()}-${destination?.trim()}`;
+    
+    // Skip if no valid inputs, already calculating, or same route as last calculation
+    if (!departure || !destination || 
+        !departure.trim() || !destination.trim() || 
+        !isGoogleMapsLoaded || 
+        !directionsServiceRef.current ||
+        isCalculating ||
+        lastRouteRef.current === routeKey) {
+      return;
     }
-  }, [departure, destination, isGoogleMapsLoaded, calculateRoute, onDistanceCalculated]);
+
+    console.log('Starting new route calculation for:', routeKey);
+    setIsCalculating(true);
+    lastRouteRef.current = routeKey;
+    
+    calculateRoute(departure, destination, stableOnDistanceCalculated);
+  }, [departure, destination, isGoogleMapsLoaded, calculateRoute, stableOnDistanceCalculated, isCalculating, directionsServiceRef]);
 
   if (!isGoogleMapsLoaded) {
     return (
